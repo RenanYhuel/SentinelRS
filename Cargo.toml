@@ -1,0 +1,8 @@
+[workspace]
+members = [
+  "crates/common",
+  "crates/agent",
+  "crates/server",
+  "crates/workers",
+  "crates/cli",
+]

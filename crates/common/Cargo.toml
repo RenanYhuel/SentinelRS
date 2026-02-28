@@ -1,0 +1,9 @@
+[package]
+name = "sentinel_common"
+version = "0.1.0"
+edition = "2021"
+description = "Common types and proto files for SentinelRS"
+
+[lib]
+name = "sentinel_common"
+path = "src/lib.rs"

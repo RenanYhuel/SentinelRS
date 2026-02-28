@@ -1,0 +1,18 @@
+# Rust
+/target/
+**/*.rs.bk
+/Cargo.lock
+
+# Editor
+.vscode/
+.idea/
+
+# Node
+node_modules/
+
+# Env
+.env
+
+# OS
+.DS_Store
+Thumbs.db

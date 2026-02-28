@@ -1,0 +1,41 @@
+syntax = "proto3";
+package sentinel.common;
+
+message Metric {
+  string name = 1;
+  map<string,string> labels = 2;
+  oneof value {
+    double d = 3;
+    int64 i = 4;
+  }
+  int64 timestamp_ms = 5;
+}
+
+message Batch {
+  string agent_id = 1;
+  string batch_id = 2;
+  uint64 seq_start = 3;
+  uint64 seq_end = 4;
+  int64 created_at_ms = 5;
+  repeated Metric metrics = 6;
+}
+
+message RegisterRequest {
+  string hw_id = 1;
+  string agent_version = 2;
+}
+message RegisterResponse {
+  string agent_id = 1;
+  string secret = 2; // provisional
+}
+
+service AgentService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc PushMetrics(Batch) returns (PushResponse);
+}
+
+message PushResponse {
+  enum Status { OK = 0; REJECTED = 1; RETRY = 2; }
+  Status status = 1;
+  string message = 2;
+}

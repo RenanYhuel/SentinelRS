@@ -1,0 +1,22 @@
+# SentinelRS agent config example
+
+agent_id: null # null => register flow
+server: https://sentinel.example.com:8443
+
+collect:
+    interval_seconds: 10
+    metrics:
+        cpu: true
+        mem: true
+        disk: true
+
+plugins_dir: /var/lib/sentinel/plugins
+
+buffer:
+    wal_dir: /var/lib/sentinel/wal
+    segment_size_mb: 16
+    max_retention_days: 7
+
+security:
+    key_store: auto
+    rotation_check_interval_hours: 24

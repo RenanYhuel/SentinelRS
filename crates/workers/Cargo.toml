@@ -1,0 +1,7 @@
+[package]
+name = "sentinel_workers"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sentinel_common = { path = "../common" }
