@@ -1,14 +1,32 @@
 syntax = "proto3";
 package sentinel.common;
 
+reserved 9000 to 9999;
+
+enum MetricType {
+  METRIC_TYPE_UNSPECIFIED = 0;
+  GAUGE = 1;
+  COUNTER = 2;
+  HISTOGRAM = 3;
+}
+
+message Histogram {
+  repeated double boundaries = 1;
+  repeated uint64 counts = 2;
+  uint64 count = 3;
+  double sum = 4;
+}
+
 message Metric {
   string name = 1;
-  map<string,string> labels = 2;
+  map<string, string> labels = 2;
+  MetricType rtype = 3;
   oneof value {
-    double d = 3;
-    int64 i = 4;
+    double value_double = 4;
+    int64 value_int = 5;
+    Histogram histogram = 6;
   }
-  int64 timestamp_ms = 5;
+  int64 timestamp_ms = 7;
 }
 
 message Batch {
@@ -18,24 +36,43 @@ message Batch {
   uint64 seq_end = 4;
   int64 created_at_ms = 5;
   repeated Metric metrics = 6;
+  map<string, string> meta = 7;
 }
 
 message RegisterRequest {
   string hw_id = 1;
   string agent_version = 2;
 }
+
 message RegisterResponse {
   string agent_id = 1;
-  string secret = 2; // provisional
+  string secret = 2;
 }
 
-service AgentService {
-  rpc Register(RegisterRequest) returns (RegisterResponse);
-  rpc PushMetrics(Batch) returns (PushResponse);
+message Heartbeat {
+  string agent_id = 1;
+  int64 ts_ms = 2;
+  map<string, string> info = 3;
 }
 
 message PushResponse {
-  enum Status { OK = 0; REJECTED = 1; RETRY = 2; }
+  enum Status {
+    OK = 0;
+    REJECTED = 1;
+    RETRY = 2;
+  }
   Status status = 1;
   string message = 2;
+}
+
+// Gère enregistrement, métriques et heartbeats.
+service AgentService {
+  // Enregistre un agent — renvoie agent_id et secret.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // Envoie un batch de métriques.
+  rpc PushMetrics(Batch) returns (PushResponse);
+
+  // Envoie un heartbeat.
+  rpc Heartbeat(Heartbeat) returns (PushResponse);
 }
