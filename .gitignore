@@ -16,3 +16,7 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local design documents (keep out of the repository)
+CAHIER_DES_CHARGES.md
+ROADMAP.md

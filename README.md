@@ -1,21 +1,46 @@
+```md
 # SentinelRS
 
-Skeleton workspace for SentinelRS — distributed monitoring system in Rust.
+SentinelRS is a lightweight, modular distributed monitoring system written in Rust.
 
-This repository contains a workspace with the following crates:
+Goal
+----
+Collect, sign and stream metrics from edge agents to a central ingestion service, with a focus on reliability (append-only WAL), safe extensibility (WASM plugins), and scalable ingestion (NATS JetStream + workers).
 
-- `crates/common` — shared types and proto files
-- `crates/agent` — agent binary (stub)
-- `crates/server` — server (API gateway) stub
-- `crates/workers` — workers skeleton
-- `crates/cli` — administration CLI skeleton
+Repository layout
+-----------------
+- `crates/common`  — shared types, protobufs and helpers
+- `crates/agent`   — agent binary (collector, WAL, exporter)
+- `crates/server`  — ingestion API (gRPC/REST), validation, NATS publisher
+- `crates/workers` — consumers, transformers and DB writers
+- `crates/cli`     — admin CLI for operational tasks
 
-See `CAHIER_DES_CHARGES.md` for the full technical specification.
+Quickstart (developer)
+-----------------------
+1. Install Rust toolchain (stable) and `cargo`.
+2. Build the workspace:
 
-<!-- Badges: CI + Repo -->
+```bash
+cargo build --workspace --release
+```
 
-[![CI](https://github.com/RenanYhuel/SentinelRS/actions/workflows/ci.yml/badge.svg)](https://github.com/RenanYhuel/SentinelRS/actions/workflows/ci.yml)
+3. Run unit tests:
 
-[Project board](https://github.com/orgs/RenanYhuel/projects) — see GitHub Projects for roadmap and planning.
+```bash
+cargo test --workspace
+```
 
-<!-- END badges -->
+Notes
+-----
+- Design documents (`CAHIER_DES_CHARGES.md`, `ROADMAP.md`) are intentionally kept out of the repository and ignored by Git for privacy — they remain in your local workspace.
+- CI skeleton is provided in `.github/workflows/ci.yml`.
+
+Contributing
+------------
+Please open issues or PRs against `main`. For major changes, draft a design note in a local document and discuss on an issue first.
+
+License
+-------
+MIT (see `LICENSE` if added)
+
+```
