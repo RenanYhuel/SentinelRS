@@ -3,7 +3,14 @@ name = "sentinel_common"
 version = "0.1.0"
 edition = "2021"
 description = "Common types and proto files for SentinelRS"
+build = "build.rs"
 
 [lib]
 name = "sentinel_common"
 path = "src/lib.rs"
+
+[dependencies]
+prost = "0.11"
+
+[build-dependencies]
+prost-build = "0.11"

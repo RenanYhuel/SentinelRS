@@ -13,3 +13,7 @@ mod tests {
         assert_eq!(super::CRATE_NAME, "sentinel_common");
     }
 }
+
+pub mod proto {
+    include!(concat!(env!("OUT_DIR"), "/sentinel.common.rs"));
+}
