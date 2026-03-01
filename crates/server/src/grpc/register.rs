@@ -3,17 +3,19 @@ use base64::Engine;
 use tonic::{Request, Response, Status};
 
 use crate::auth::generate_secret;
+use crate::persistence::AgentRepo;
 use crate::store::{AgentRecord, AgentStore};
 use sentinel_common::proto::{RegisterRequest, RegisterResponse};
 use sentinel_common::trace_id::generate_trace_id;
 
 pub async fn handle_register(
     store: &AgentStore,
+    repo: Option<&AgentRepo>,
     request: Request<RegisterRequest>,
 ) -> Result<Response<RegisterResponse>, Status> {
     let trace_id = generate_trace_id();
     let req = request.into_inner();
-    let _span = tracing::info_span!("register", %trace_id, hw_id = %req.hw_id).entered();
+    tracing::info!(%trace_id, hw_id = %req.hw_id, "register request");
 
     if req.hw_id.is_empty() {
         return Err(Status::invalid_argument("hw_id is required"));
@@ -45,7 +47,13 @@ pub async fn handle_register(
         deprecated_keys: Vec::new(),
     };
 
-    store.insert(record);
+    store.insert(record.clone());
+
+    if let Some(r) = repo {
+        if let Err(e) = r.upsert(&record).await {
+            tracing::error!(error = %e, %agent_id, "failed to persist agent to database");
+        }
+    }
 
     Ok(Response::new(RegisterResponse {
         agent_id,
@@ -64,7 +72,7 @@ mod tests {
             hw_id: "hw-123".into(),
             agent_version: "0.1.0".into(),
         });
-        let resp = handle_register(&store, req).await.unwrap();
+        let resp = handle_register(&store, None, req).await.unwrap();
         let inner = resp.into_inner();
         assert!(inner.agent_id.starts_with("agent-"));
         assert!(!inner.secret.is_empty());
@@ -78,13 +86,13 @@ mod tests {
             hw_id: "hw-123".into(),
             agent_version: "0.1.0".into(),
         });
-        let resp1 = handle_register(&store, req1).await.unwrap().into_inner();
+        let resp1 = handle_register(&store, None, req1).await.unwrap().into_inner();
 
         let req2 = Request::new(RegisterRequest {
             hw_id: "hw-123".into(),
             agent_version: "0.2.0".into(),
         });
-        let resp2 = handle_register(&store, req2).await.unwrap().into_inner();
+        let resp2 = handle_register(&store, None, req2).await.unwrap().into_inner();
 
         assert_eq!(resp1.agent_id, resp2.agent_id);
         assert_eq!(resp1.secret, resp2.secret);
@@ -98,7 +106,7 @@ mod tests {
             hw_id: "".into(),
             agent_version: "0.1.0".into(),
         });
-        let err = handle_register(&store, req).await.unwrap_err();
+        let err = handle_register(&store, None, req).await.unwrap_err();
         assert_eq!(err.code(), tonic::Code::InvalidArgument);
     }
 }

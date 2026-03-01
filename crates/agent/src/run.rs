@@ -100,7 +100,7 @@ fn spawn_sender(
         };
 
         loop {
-            match GrpcClient::connect(&server, agent_id.clone(), &secret, "default".into()).await {
+            match GrpcClient::connect(&server, agent_id.clone(), &secret, None).await {
                 Ok(mut client) => {
                     tracing::info!("connected to server");
                     state.set_ready(true);

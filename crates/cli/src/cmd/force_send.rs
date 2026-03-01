@@ -66,7 +66,7 @@ pub async fn execute(
         endpoint,
         creds.agent_id.clone(),
         &secret,
-        "default".to_string(),
+        None,
     )
     .await
     .context("failed to connect")?;

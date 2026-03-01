@@ -78,6 +78,7 @@ impl AgentStore {
         let record = self.agents.get(agent_id)?;
 
         match key_id {
+            None | Some("default") => Some(record.secret.clone()),
             Some(kid) if kid == record.key_id => Some(record.secret.clone()),
             Some(kid) => {
                 let now_ms = std::time::SystemTime::now()
@@ -90,7 +91,6 @@ impl AgentStore {
                     .find(|dk| dk.key_id == kid && (now_ms - dk.deprecated_at_ms) < grace_period_ms)
                     .map(|dk| dk.secret.clone())
             }
-            None => Some(record.secret.clone()),
         }
     }
 
@@ -151,5 +151,21 @@ mod tests {
         let store = AgentStore::new();
         assert!(store.get("nope").is_none());
         assert!(store.find_by_hw_id("nope").is_none());
+    }
+
+    #[test]
+    fn find_key_secret_default_returns_primary() {
+        let store = AgentStore::new();
+        store.insert(sample_record());
+        let secret = store.find_key_secret("agent-1", Some("default"), 86400000);
+        assert_eq!(secret, Some(b"secret".to_vec()));
+    }
+
+    #[test]
+    fn find_key_secret_none_returns_primary() {
+        let store = AgentStore::new();
+        store.insert(sample_record());
+        let secret = store.find_key_secret("agent-1", None, 86400000);
+        assert_eq!(secret, Some(b"secret".to_vec()));
     }
 }
