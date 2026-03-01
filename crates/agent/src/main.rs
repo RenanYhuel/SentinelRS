@@ -1,3 +1,4 @@
+mod buffer;
 mod collector;
 mod scheduler;
 
