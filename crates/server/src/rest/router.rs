@@ -16,10 +16,10 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(health::healthz))
         .route("/ready", get(health::ready))
         .route("/v1/agents", get(agents::list_agents))
-        .route("/v1/agents/{agent_id}", get(agents::get_agent))
+        .route("/v1/agents/:agent_id", get(agents::get_agent))
         .route("/v1/rules", get(rules::list_rules).post(rules::create_rule))
         .route(
-            "/v1/rules/{rule_id}",
+            "/v1/rules/:rule_id",
             get(rules::get_rule)
                 .put(rules::update_rule)
                 .delete(rules::delete_rule),

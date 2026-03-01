@@ -265,10 +265,10 @@ Notes : Use TimescaleDB native functions for downsampling & continuous aggregate
 
 13. Tests & E2E
 
-- [ ] 13.1. Unit tests per crate (run `cargo test`). Each crate must have >= minimal coverage on core logic.
-- [ ] 13.2. Integration tests in `tests/` which spin up lightweight NATS + Postgres containers (via docker compose) and run real flows: agent stub sends batch -> server -> nats -> worker consumes -> db insert -> alert triggered.
-- [ ] 13.3. E2E scenario scripts in `tests/e2e/` automating these flows and verifying acceptance criteria.
-- [ ] 13.4. Add flakiness detection (retry until success or fail) to reduce CI brittleness.
+- [x] 13.1. Unit tests per crate (run `cargo test`). Each crate must have >= minimal coverage on core logic.
+- [x] 13.2. Integration tests in `tests/` which spin up lightweight NATS + Postgres containers (via docker compose) and run real flows: agent stub sends batch -> server -> nats -> worker consumes -> db insert -> alert triggered.
+- [x] 13.3. E2E scenario scripts in `tests/e2e/` automating these flows and verifying acceptance criteria.
+- [x] 13.4. Add flakiness detection (retry until success or fail) to reduce CI brittleness.
 
 ---
 
