@@ -13,6 +13,7 @@ pub struct ServerConfig {
     pub grpc_addr: SocketAddr,
     pub rest_addr: SocketAddr,
     pub jwt_secret: Vec<u8>,
+    pub nats_url: String,
     pub rate_limit_rps: u64,
     pub key_grace_period_ms: i64,
     pub replay_window_ms: i64,
@@ -25,6 +26,7 @@ impl Default for ServerConfig {
             grpc_addr: "0.0.0.0:50051".parse().unwrap(),
             rest_addr: "0.0.0.0:8080".parse().unwrap(),
             jwt_secret: b"change-me-in-production".to_vec(),
+            nats_url: "nats://127.0.0.1:4222".into(),
             rate_limit_rps: 100,
             key_grace_period_ms: 24 * 60 * 60 * 1000,
             replay_window_ms: 5 * 60 * 1000,
@@ -68,6 +70,12 @@ impl ServerConfig {
             });
         }
 
+        if let Some(ref url) = args.nats_url {
+            config.nats_url = url.clone();
+        } else if let Ok(val) = std::env::var("NATS_URL") {
+            config.nats_url = val;
+        }
+
         config
     }
 }
@@ -84,6 +92,7 @@ struct CliArgs {
     grpc_addr: Option<SocketAddr>,
     rest_addr: Option<SocketAddr>,
     jwt_secret: Option<String>,
+    nats_url: Option<String>,
     tls_cert: Option<PathBuf>,
     tls_key: Option<PathBuf>,
     tls_ca: Option<PathBuf>,
@@ -95,6 +104,7 @@ impl CliArgs {
             grpc_addr: None,
             rest_addr: None,
             jwt_secret: None,
+            nats_url: None,
             tls_cert: None,
             tls_key: None,
             tls_ca: None,
@@ -134,6 +144,9 @@ impl CliArgs {
                 "--jwt-secret" => {
                     result.jwt_secret = args.next();
                 }
+                "--nats-url" => {
+                    result.nats_url = args.next();
+                }
                 "--tls-cert" => {
                     result.tls_cert = args.next().map(PathBuf::from);
                 }
@@ -163,6 +176,7 @@ fn print_help() {
     println!("      --rest-addr <ADDR>   REST listen address  (default: 0.0.0.0:8080)");
     println!("      --rest-port <PORT>   REST listen port     (default: 8080)");
     println!("      --jwt-secret <KEY>   JWT signing secret");
+    println!("      --nats-url <URL>     NATS server URL     (default: nats://127.0.0.1:4222)");
     println!("      --tls-cert <PATH>    TLS certificate path");
     println!("      --tls-key <PATH>     TLS private key path");
     println!("      --tls-ca <PATH>      TLS CA certificate path");
@@ -174,5 +188,6 @@ fn print_help() {
     println!("  REST_ADDR    Full REST listen address (e.g. 0.0.0.0:8080)");
     println!("  REST_PORT    REST port only");
     println!("  JWT_SECRET   JWT signing secret");
+    println!("  NATS_URL     NATS server URL");
     println!("\nPrecedence: CLI flags > environment variables > defaults");
 }

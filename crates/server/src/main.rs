@@ -1,4 +1,4 @@
-use sentinel_server::broker::InMemoryBroker;
+use sentinel_server::broker::{connect_jetstream, ensure_stream, NatsPublisher};
 use sentinel_server::config::ServerConfig;
 use sentinel_server::grpc::AgentServiceImpl;
 use sentinel_server::metrics::server_metrics::ServerMetrics;
@@ -6,6 +6,7 @@ use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
 use sentinel_server::tls::TlsIdentity;
 
+use sentinel_common::nats_config::StreamConfig;
 use sentinel_common::proto::agent_service_server::AgentServiceServer;
 use tonic::transport::Server as TonicServer;
 
@@ -19,9 +20,21 @@ async fn main() {
         .init();
 
     let config = ServerConfig::from_env_and_args();
+
+    let js = connect_jetstream(&config.nats_url)
+        .await
+        .expect("failed to connect to NATS JetStream");
+    tracing::info!(url = %config.nats_url, "connected to NATS JetStream");
+
+    let stream_config = StreamConfig::default();
+    ensure_stream(&js, &stream_config)
+        .await
+        .expect("failed to ensure NATS stream");
+    tracing::info!(stream = %stream_config.name, "NATS stream ready");
+
     let agents = AgentStore::new();
     let idempotency = IdempotencyStore::new();
-    let broker = InMemoryBroker::new();
+    let broker = NatsPublisher::new(js);
     let server_metrics = ServerMetrics::new();
 
     let tls_identity = config

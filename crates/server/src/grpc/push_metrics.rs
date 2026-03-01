@@ -42,12 +42,17 @@ pub async fn handle_push_metrics_with_config(
     tracing::info!(%trace_id, %agent_id, "push_metrics request");
 
     if agents.get(&agent_id).is_none() {
+        tracing::warn!(%trace_id, %agent_id, "rejected: unknown agent");
         return Err(Status::unauthenticated("unknown agent"));
     }
 
-    let secret = agents
-        .find_key_secret(&agent_id, key_id.as_deref(), grace_period_ms)
-        .ok_or_else(|| Status::unauthenticated("unknown or expired key"))?;
+    let secret = match agents.find_key_secret(&agent_id, key_id.as_deref(), grace_period_ms) {
+        Some(s) => s,
+        None => {
+            tracing::warn!(%trace_id, %agent_id, key_id = ?key_id, "rejected: unknown or expired key");
+            return Err(Status::unauthenticated("unknown or expired key"));
+        }
+    };
 
     let batch = request.into_inner();
 
@@ -55,6 +60,7 @@ pub async fn handle_push_metrics_with_config(
     if replay_window_ms > 0 && batch.created_at_ms > 0 {
         let age = (now_ms - batch.created_at_ms).abs();
         if age > replay_window_ms {
+            tracing::warn!(%trace_id, %agent_id, %age, %replay_window_ms, "rejected: replay window exceeded");
             return Err(Status::unauthenticated(
                 "batch timestamp outside replay window",
             ));
@@ -63,6 +69,7 @@ pub async fn handle_push_metrics_with_config(
 
     let canonical = sentinel_common::canonicalize::canonical_bytes(&batch);
     if !verify_signature(&secret, &canonical, &signature) {
+        tracing::warn!(%trace_id, %agent_id, "rejected: invalid HMAC signature");
         return Err(Status::unauthenticated("invalid signature"));
     }
 

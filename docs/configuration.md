@@ -98,6 +98,7 @@ The server uses a `ServerConfig` struct with defaults that can be overridden via
 | `grpc_addr`           | `0.0.0.0:50051`           | `--grpc-addr`  | `GRPC_ADDR`  | gRPC listener address              |
 | `rest_addr`           | `0.0.0.0:8080`            | `--rest-addr`  | `REST_ADDR`  | REST API listener address          |
 | `jwt_secret`          | `change-me-in-production` | `--jwt-secret` | `JWT_SECRET` | Secret for JWT HMAC-SHA256 signing |
+| `nats_url`            | `nats://127.0.0.1:4222`   | `--nats-url`   | `NATS_URL`   | NATS server URL for JetStream      |
 | `rate_limit_rps`      | `100`                     | —              | —            | Maximum requests per second        |
 | `key_grace_period_ms` | `86400000` (24h)          | —              | —            | Grace period after key rotation    |
 | `replay_window_ms`    | `300000` (5min)           | —              | —            | Time window for replay detection   |
@@ -115,6 +116,7 @@ Options:
       --rest-addr <ADDR>   REST listen address  (default: 0.0.0.0:8080)
       --rest-port <PORT>   REST listen port     (default: 8080)
       --jwt-secret <KEY>   JWT signing secret
+      --nats-url <URL>     NATS server URL     (default: nats://127.0.0.1:4222)
       --tls-cert <PATH>    TLS certificate path
       --tls-key <PATH>     TLS private key path
       --tls-ca <PATH>      TLS CA certificate path
