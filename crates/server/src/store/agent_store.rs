@@ -11,6 +11,12 @@ pub struct AgentStore {
     by_hw_id: Arc<DashMap<String, String>>,
 }
 
+impl Default for AgentStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentStore {
     pub fn new() -> Self {
         Self {

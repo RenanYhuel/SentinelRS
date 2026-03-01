@@ -6,6 +6,12 @@ pub struct IdempotencyStore {
     seen: Arc<DashMap<String, i64>>,
 }
 
+impl Default for IdempotencyStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IdempotencyStore {
     pub fn new() -> Self {
         Self {

@@ -11,6 +11,12 @@ pub struct InMemoryBroker {
     count: Arc<AtomicUsize>,
 }
 
+impl Default for InMemoryBroker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InMemoryBroker {
     pub fn new() -> Self {
         Self {

@@ -36,8 +36,8 @@ pub async fn handle_push_metrics_with_config(
     replay_window_ms: i64,
 ) -> Result<Response<PushResponse>, Status> {
     let trace_id = generate_trace_id();
-    let agent_id = extract_metadata(&request, "x-agent-id")?;
-    let signature = extract_metadata(&request, "x-signature")?;
+    let agent_id = extract_metadata(&request, "x-agent-id").map_err(|e| *e)?;
+    let signature = extract_metadata(&request, "x-signature").map_err(|e| *e)?;
     let key_id = extract_metadata_opt(&request, "x-key-id");
     tracing::info!(%trace_id, %agent_id, "push_metrics request");
 
@@ -96,13 +96,13 @@ pub async fn handle_push_metrics_with_config(
     }))
 }
 
-fn extract_metadata(request: &Request<Batch>, key: &str) -> Result<String, Status> {
+fn extract_metadata(request: &Request<Batch>, key: &str) -> Result<String, Box<Status>> {
     request
         .metadata()
         .get(key)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
-        .ok_or_else(|| Status::unauthenticated(format!("missing {key} header")))
+        .ok_or_else(|| Box::new(Status::unauthenticated(format!("missing {key} header"))))
 }
 
 fn extract_metadata_opt(request: &Request<Batch>, key: &str) -> Option<String> {

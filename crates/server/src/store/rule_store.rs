@@ -8,6 +8,12 @@ pub struct RuleStore {
     rules: Arc<DashMap<String, RuleRecord>>,
 }
 
+impl Default for RuleStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RuleStore {
     pub fn new() -> Self {
         Self {
