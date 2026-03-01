@@ -192,45 +192,45 @@ Operational notes : Start with single stream; expose scripts `deploy/nats-setup.
 
 9.A Consumer & message handling
 
-- [ ] 9.A.1. Implement JetStream consumer (pull or push) with explicit ack.
-- [ ] 9.A.2. On message receipt: parse envelope, verify signature again (defense-in-depth), deserialize Batch.
-- [ ] 9.A.3. Dedup check: consult `batch_id` cache/table; if processed -> ack and skip.
-- [ ] Tests : unit parse + dedup.
+- [x] 9.A.1. Implement JetStream consumer (pull or push) with explicit ack.
+- [x] 9.A.2. On message receipt: parse envelope, verify signature again (defense-in-depth), deserialize Batch.
+- [x] 9.A.3. Dedup check: consult `batch_id` cache/table; if processed -> ack and skip.
+- [x] Tests : unit parse + dedup.
 
     9.B Transformer
 
-- [ ] 9.B.1. Transform each Metric into DB row(s) for Timescale table schema.
-- [ ] 9.B.2. Normalize labels (store as JSONB) and flatten histograms if present.
-- [ ] Tests : sample batch -> expected rows generation.
+- [x] 9.B.1. Transform each Metric into DB row(s) for Timescale table schema.
+- [x] 9.B.2. Normalize labels (store as JSONB) and flatten histograms if present.
+- [x] Tests : sample batch -> expected rows generation.
 
     9.C Storage writer
 
-- [ ] 9.C.1. Use `sqlx` (async) with connection pool to TimescaleDB.
-- [ ] 9.C.2. Implement batched inserts with COPY-like performance; fallback to INSERT with transaction.
-- [ ] 9.C.3. Implement retry logic on DB transient errors with backoff.
-- [ ] Tests : integration tests with Timescale dev container.
+- [x] 9.C.1. Use `sqlx` (async) with connection pool to TimescaleDB.
+- [x] 9.C.2. Implement batched inserts with COPY-like performance; fallback to INSERT with transaction.
+- [x] 9.C.3. Implement retry logic on DB transient errors with backoff.
+- [x] Tests : integration tests with Timescale dev container.
 
     9.D Aggregator & rollups
 
-- [ ] 9.D.1. Implement aggregator module to compute rolling aggregates used by alert engine (or compute via DB views if preferred).
-- [ ] 9.D.2. Provide API for rules engine to fetch aggregated values efficiently.
+- [x] 9.D.1. Implement aggregator module to compute rolling aggregates used by alert engine (or compute via DB views if preferred).
+- [x] 9.D.2. Provide API for rules engine to fetch aggregated values efficiently.
 
     9.E Alert engine
 
-- [ ] 9.E.1. Evaluate rules per agent/metric as batches are processed or as periodic job triggered by worker.
-- [ ] 9.E.2. Implement rule state machine (ok -> firing -> resolved), fingerprinting to dedup.
-- [ ] 9.E.3. Persist alert events in `alerts` table and push to notifier queue.
-- [ ] Tests : unit rules evaluation with synthetic metrics inputs.
+- [x] 9.E.1. Evaluate rules per agent/metric as batches are processed or as periodic job triggered by worker.
+- [x] 9.E.2. Implement rule state machine (ok -> firing -> resolved), fingerprinting to dedup.
+- [x] 9.E.3. Persist alert events in `alerts` table and push to notifier queue.
+- [x] Tests : unit rules evaluation with synthetic metrics inputs.
 
     9.F Notifier executor
 
-- [ ] 9.F.1. Implement pluggable notifiers (webhook, slack, discord, smtp). Each notifier must accept an alert payload and handle retries.
-- [ ] 9.F.2. Sign webhook payload with HMAC secret for target verification.
-- [ ] Tests : mocked HTTP endpoints and smtp server.
+- [x] 9.F.1. Implement pluggable notifiers (webhook, slack, discord, smtp). Each notifier must accept an alert payload and handle retries.
+- [x] 9.F.2. Sign webhook payload with HMAC secret for target verification.
+- [x] Tests : mocked HTTP endpoints and smtp server.
 
     9.G Observability & metrics
 
-- [ ] 9.G.1. Worker exposes Prometheus metrics: processing latency, db latency, errors, ack rates.
+- [x] 9.G.1. Worker exposes Prometheus metrics: processing latency, db latency, errors, ack rates.
 
 ---
 
