@@ -248,10 +248,10 @@ Notes : Use TimescaleDB native functions for downsampling & continuous aggregate
 
 11. Alert engine & notifiers (détails)
 
-- [ ] 11.1. Define rule storage format (JSON DSL) and CRUD via server REST.
-- [ ] 11.2. Implement test harness for rules (simulate metric streams and verify expected alerts).
-- [ ] 11.3. Implement notifier retry policy and dead-letter handling (store failed notifications to `notifications_dlq`).
-- [ ] 11.4. UI hooks: provide test/send endpoint for each notifier to validate credentials.
+- [x] 11.1. Define rule storage format (JSON DSL) and CRUD via server REST.
+- [x] 11.2. Implement test harness for rules (simulate metric streams and verify expected alerts).
+- [x] 11.3. Implement notifier retry policy and dead-letter handling (store failed notifications to `notifications_dlq`).
+- [x] 11.4. UI hooks: provide test/send endpoint for each notifier to validate credentials.
 
 ---
 
