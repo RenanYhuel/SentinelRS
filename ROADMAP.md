@@ -29,7 +29,7 @@ Index (sections)
 - [ ]   13. Tests & E2E
 - [ ]   14. CI / Releases / Packaging
 - [ ]   15. Sécurité et provisioning
-- [ ]   16. Observabilité & monitoring interne
+- [x]   16. Observabilité & monitoring interne
 - [ ]   17. Backlog initial (tickets détaillés)
 
 ---
@@ -293,9 +293,9 @@ Notes : Use TimescaleDB native functions for downsampling & continuous aggregate
 
 16. Observabilité & monitoring interne
 
-- [ ] 16.1. Export Prometheus metrics on all components (agent, server, workers). Define metric names and labels convention.
-- [ ] 16.2. Implement health checks `/healthz` & `/ready` for each binary.
-- [ ] 16.3. Add structured logs (JSON) and log correlation fields (`agent_id`, `batch_id`, `trace_id`).
+- [x] 16.1. Export Prometheus metrics on all components (agent, server, workers). Define metric names and labels convention.
+- [x] 16.2. Implement health checks `/healthz` & `/ready` for each binary.
+- [x] 16.3. Add structured logs (JSON) and log correlation fields (`agent_id`, `batch_id`, `trace_id`).
 
 ---
 

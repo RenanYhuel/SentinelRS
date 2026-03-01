@@ -2,6 +2,7 @@ use tonic::{Request, Response, Status};
 
 use sentinel_common::proto::push_response::Status as PushStatus;
 use sentinel_common::proto::{Batch, PushResponse};
+use sentinel_common::trace_id::generate_trace_id;
 use crate::auth::verify_signature;
 use crate::broker::BrokerPublisher;
 use crate::store::{AgentStore, IdempotencyStore};
@@ -34,9 +35,11 @@ pub async fn handle_push_metrics_with_config(
     grace_period_ms: i64,
     replay_window_ms: i64,
 ) -> Result<Response<PushResponse>, Status> {
+    let trace_id = generate_trace_id();
     let agent_id = extract_metadata(&request, "x-agent-id")?;
     let signature = extract_metadata(&request, "x-signature")?;
     let key_id = extract_metadata_opt(&request, "x-key-id");
+    tracing::info!(%trace_id, %agent_id, "push_metrics request");
 
     if agents.get(&agent_id).is_none() {
         return Err(Status::unauthenticated("unknown agent"));

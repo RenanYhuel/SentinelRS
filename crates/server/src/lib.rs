@@ -2,6 +2,7 @@ pub mod auth;
 pub mod broker;
 pub mod config;
 pub mod grpc;
+pub mod metrics;
 pub mod middleware;
 pub mod rest;
 pub mod store;

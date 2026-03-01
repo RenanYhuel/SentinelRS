@@ -1,20 +1,25 @@
 use axum::Router;
 use axum::routing::{get, post};
+use std::sync::Arc;
 
+use crate::metrics::server_metrics::ServerMetrics;
 use crate::store::{AgentStore, RuleStore};
-use super::{agents, health, key_rotation, notifiers, rules};
+use super::{agents, health, key_rotation, metrics, notifiers, rules};
 
 #[derive(Clone)]
 pub struct AppState {
     pub agents: AgentStore,
     pub rules: RuleStore,
     pub jwt_secret: Vec<u8>,
+    pub metrics: Arc<ServerMetrics>,
 }
 
 pub fn router(state: AppState) -> Router {
+    let metrics_state = state.metrics.clone();
     Router::new()
         .route("/healthz", get(health::healthz))
         .route("/ready", get(health::ready))
+        .route("/metrics", get(metrics::metrics).with_state(metrics_state))
         .route("/v1/agents", get(agents::list_agents))
         .route("/v1/agents/:agent_id", get(agents::get_agent))
         .route(

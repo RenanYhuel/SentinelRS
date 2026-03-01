@@ -1,6 +1,7 @@
 mod agents;
 mod health;
 mod key_rotation;
+mod metrics;
 mod notifiers;
 mod router;
 mod rules;

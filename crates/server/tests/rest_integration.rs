@@ -2,6 +2,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
 
+use sentinel_server::metrics::server_metrics::ServerMetrics;
 use sentinel_server::rest::{router, AppState};
 use sentinel_server::store::{AgentRecord, AgentStore, RuleStore};
 
@@ -10,6 +11,7 @@ fn app_state() -> AppState {
         agents: AgentStore::new(),
         rules: RuleStore::new(),
         jwt_secret: b"test-secret".to_vec(),
+        metrics: ServerMetrics::new(),
     }
 }
 

@@ -9,3 +9,4 @@ pub mod metric_json;
 pub mod nats_config;
 pub mod retry;
 pub mod seq;
+pub mod trace_id;

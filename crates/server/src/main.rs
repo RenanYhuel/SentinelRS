@@ -1,6 +1,7 @@
 use sentinel_server::broker::InMemoryBroker;
 use sentinel_server::config::ServerConfig;
 use sentinel_server::grpc::AgentServiceImpl;
+use sentinel_server::metrics::server_metrics::ServerMetrics;
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
 use sentinel_server::tls::TlsIdentity;
@@ -15,12 +16,14 @@ async fn main() {
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "info".into()),
         )
+        .json()
         .init();
 
     let config = ServerConfig::default();
     let agents = AgentStore::new();
     let idempotency = IdempotencyStore::new();
     let broker = InMemoryBroker::new();
+    let server_metrics = ServerMetrics::new();
 
     let tls_identity = config.tls.as_ref().map(|tls_cfg| {
         TlsIdentity::load(tls_cfg).expect("failed to load TLS certificates")
@@ -50,6 +53,7 @@ async fn main() {
         agents,
         rules: RuleStore::new(),
         jwt_secret: config.jwt_secret,
+        metrics: server_metrics,
     };
     let rest_app = rest::router(app_state);
     let rest_addr = config.rest_addr;

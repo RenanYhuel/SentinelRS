@@ -3,6 +3,7 @@ use base64::engine::general_purpose::STANDARD;
 use tonic::{Request, Response, Status};
 
 use sentinel_common::proto::{RegisterRequest, RegisterResponse};
+use sentinel_common::trace_id::generate_trace_id;
 use crate::auth::generate_secret;
 use crate::store::{AgentRecord, AgentStore};
 
@@ -10,7 +11,9 @@ pub async fn handle_register(
     store: &AgentStore,
     request: Request<RegisterRequest>,
 ) -> Result<Response<RegisterResponse>, Status> {
+    let trace_id = generate_trace_id();
     let req = request.into_inner();
+    let _span = tracing::info_span!("register", %trace_id, hw_id = %req.hw_id).entered();
 
     if req.hw_id.is_empty() {
         return Err(Status::invalid_argument("hw_id is required"));

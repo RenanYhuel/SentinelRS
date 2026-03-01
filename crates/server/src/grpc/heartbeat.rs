@@ -2,13 +2,16 @@ use tonic::{Request, Response, Status};
 
 use sentinel_common::proto::push_response::Status as PushStatus;
 use sentinel_common::proto::{Heartbeat, PushResponse};
+use sentinel_common::trace_id::generate_trace_id;
 use crate::store::AgentStore;
 
 pub async fn handle_heartbeat(
     agents: &AgentStore,
     request: Request<Heartbeat>,
 ) -> Result<Response<PushResponse>, Status> {
+    let trace_id = generate_trace_id();
     let hb = request.into_inner();
+    let _span = tracing::info_span!("heartbeat", %trace_id, agent_id = %hb.agent_id).entered();
 
     if hb.agent_id.is_empty() {
         return Err(Status::invalid_argument("agent_id is required"));
