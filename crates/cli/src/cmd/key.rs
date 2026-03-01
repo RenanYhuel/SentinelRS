@@ -3,7 +3,7 @@ use clap::Subcommand;
 use std::path::PathBuf;
 
 use sentinel_agent::config::{EncryptedFileStore, KeyStore};
-use crate::output::{OutputMode, print_json, print_success, print_info};
+use crate::output::{OutputMode, print_json, print_success, spinner, theme, confirm};
 use super::helpers;
 
 #[derive(Subcommand)]
@@ -17,7 +17,6 @@ pub enum KeyCmd {
 pub struct RotateArgs {
     #[arg(long, help = "New key ID")]
     key_id: String,
-
     #[arg(long, help = "New secret (base64-encoded)")]
     secret: String,
 }
@@ -29,6 +28,8 @@ pub struct ListArgs;
 pub struct DeleteKeyArgs {
     #[arg(help = "Key ID to delete")]
     key_id: String,
+    #[arg(long, help = "Skip confirmation prompt")]
+    yes: bool,
 }
 
 pub async fn execute(
@@ -76,9 +77,18 @@ fn rotate(args: RotateArgs, mode: OutputMode, config_path: Option<String>) -> Re
     )
     .context("invalid base64 secret")?;
 
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Rotating key...")),
+        OutputMode::Json => None,
+    };
+
     store
         .store(&args.key_id, &secret_bytes)
         .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    if let Some(sp) = sp {
+        spinner::finish_ok(&sp, "Key rotated successfully");
+    }
 
     match mode {
         OutputMode::Json => print_json(&serde_json::json!({
@@ -86,9 +96,8 @@ fn rotate(args: RotateArgs, mode: OutputMode, config_path: Option<String>) -> Re
             "key_id": args.key_id,
         }))?,
         OutputMode::Human => {
-            print_success("Key rotated successfully");
-            print_info("Key ID", &args.key_id);
-            print_info("Store", &dir.display().to_string());
+            theme::print_kv("Key ID", &args.key_id);
+            theme::print_kv("Store", &dir.display().to_string());
         }
     }
 
@@ -115,10 +124,11 @@ fn list(_args: ListArgs, mode: OutputMode, config_path: Option<String>) -> Resul
             if keys.is_empty() {
                 print_success("No keys in store");
             } else {
-                print_success(&format!("{} key(s) found:", keys.len()));
+                theme::print_header(&format!("{} Key(s) Found", keys.len()));
                 for k in &keys {
-                    print_info("Key ID", k);
+                    theme::print_kv("Key ID", k);
                 }
+                println!();
             }
         }
     }
@@ -127,6 +137,14 @@ fn list(_args: ListArgs, mode: OutputMode, config_path: Option<String>) -> Resul
 }
 
 fn delete(args: DeleteKeyArgs, mode: OutputMode, config_path: Option<String>) -> Result<()> {
+    if mode == OutputMode::Human && !args.yes {
+        let msg = format!("Delete key '{}'? This cannot be undone.", args.key_id);
+        if !confirm::confirm_action(&msg) {
+            theme::print_dim("  Cancelled.");
+            return Ok(());
+        }
+    }
+
     let dir = key_store_dir(config_path.as_deref())?;
     let store = EncryptedFileStore::new(&dir, master_key());
 

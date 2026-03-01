@@ -334,11 +334,3 @@ Notes d'implémentation transverses
 - Safety : design for at-least-once delivery et idempotence via `batch_id` server-side dedup.
 
 ---
-
-Prochaine action après validation
-
-- Si vous validez la roadmap, je génère automatiquement les tickets (issues) pour les items 17.x et peux commencer à implémenter le premier set (proto gen + agent collector minimal). Indiquez-moi si vous voulez que je crée les issues dans un format prêt à importer.
-
----
-
-Fin de la roadmap détaillée.

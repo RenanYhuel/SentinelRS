@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Args;
 
-use crate::output::{OutputMode, print_json, print_success, print_error};
+use crate::output::{OutputMode, print_json, spinner, theme};
 use super::helpers;
 
 #[derive(Args)]
@@ -15,24 +15,45 @@ pub async fn execute(
 ) -> Result<()> {
     let base = helpers::resolve_rest_url(server.as_deref(), config_path.as_deref())?;
 
+    if mode == OutputMode::Human {
+        theme::print_header("Health Checks");
+    }
+
+    let sp_health = match mode {
+        OutputMode::Human => Some(spinner::create("Checking /healthz ...")),
+        OutputMode::Json => None,
+    };
+
     let healthz = check_endpoint(&format!("{base}/healthz")).await;
+
+    if let Some(sp) = sp_health {
+        match &healthz {
+            Ok(_) => spinner::finish_ok(&sp, "Health check: OK"),
+            Err(e) => spinner::finish_err(&sp, &format!("Health check: {e}")),
+        }
+    }
+
+    let sp_ready = match mode {
+        OutputMode::Human => Some(spinner::create("Checking /ready ...")),
+        OutputMode::Json => None,
+    };
+
     let ready = check_endpoint(&format!("{base}/ready")).await;
 
-    match mode {
-        OutputMode::Json => print_json(&serde_json::json!({
+    if let Some(sp) = sp_ready {
+        match &ready {
+            Ok(_) => spinner::finish_ok(&sp, "Ready check: OK"),
+            Err(e) => spinner::finish_err(&sp, &format!("Ready check: {e}")),
+        }
+    }
+
+    if mode == OutputMode::Json {
+        print_json(&serde_json::json!({
             "healthz": healthz.is_ok(),
             "ready": ready.is_ok(),
-        }))?,
-        OutputMode::Human => {
-            match &healthz {
-                Ok(_) => print_success("Health check: OK"),
-                Err(e) => print_error(&format!("Health check: {e}")),
-            }
-            match &ready {
-                Ok(_) => print_success("Ready check: OK"),
-                Err(e) => print_error(&format!("Ready check: {e}")),
-            }
-        }
+        }))?;
+    } else {
+        println!();
     }
 
     Ok(())

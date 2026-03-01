@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use crate::output::{OutputMode, print_json, print_success, print_info, build_table};
+use crate::output::{OutputMode, print_json, print_success, build_table, spinner, theme, confirm};
 use super::helpers;
 
 #[derive(Subcommand)]
@@ -37,6 +37,8 @@ pub struct UpdateArgs {
 pub struct DeleteArgs {
     #[arg(help = "Rule ID")]
     id: String,
+    #[arg(long, help = "Skip confirmation prompt")]
+    yes: bool,
 }
 
 pub async fn execute(
@@ -58,8 +60,18 @@ pub async fn execute(
 
 async fn list(base: &str, mode: OutputMode) -> Result<()> {
     let url = format!("{base}/v1/rules");
+
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Fetching rules...")),
+        OutputMode::Json => None,
+    };
+
     let resp = reqwest::get(&url).await?.error_for_status()?;
     let rules: Vec<serde_json::Value> = resp.json().await?;
+
+    if let Some(sp) = sp {
+        spinner::finish_clear(&sp);
+    }
 
     match mode {
         OutputMode::Json => print_json(&rules)?,
@@ -68,6 +80,7 @@ async fn list(base: &str, mode: OutputMode) -> Result<()> {
                 print_success("No alert rules defined");
                 return Ok(());
             }
+            theme::print_header("Alert Rules");
             let mut table = build_table(&["ID", "Name", "Metric", "Condition", "Threshold"]);
             for r in &rules {
                 table.add_row(vec![
@@ -87,16 +100,27 @@ async fn list(base: &str, mode: OutputMode) -> Result<()> {
 
 async fn get(base: &str, args: GetArgs, mode: OutputMode) -> Result<()> {
     let url = format!("{base}/v1/rules/{}", args.id);
+
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Fetching rule...")),
+        OutputMode::Json => None,
+    };
+
     let resp = reqwest::get(&url).await?.error_for_status()?;
     let rule: serde_json::Value = resp.json().await?;
+
+    if let Some(sp) = sp {
+        spinner::finish_clear(&sp);
+    }
 
     match mode {
         OutputMode::Json => print_json(&rule)?,
         OutputMode::Human => {
-            print_success("Rule details:");
+            theme::print_header("Rule Details");
             for (k, v) in rule.as_object().into_iter().flatten() {
-                print_info(k, &v.to_string());
+                theme::print_kv(k, &v.to_string());
             }
+            println!();
         }
     }
 
@@ -116,6 +140,11 @@ async fn create(base: &str, args: CreateArgs, mode: OutputMode) -> Result<()> {
     let body = parse_json_data(&args.data)?;
     let url = format!("{base}/v1/rules");
 
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Creating rule...")),
+        OutputMode::Json => None,
+    };
+
     let client = reqwest::Client::new();
     let resp = client
         .post(&url)
@@ -126,11 +155,14 @@ async fn create(base: &str, args: CreateArgs, mode: OutputMode) -> Result<()> {
 
     let created: serde_json::Value = resp.json().await?;
 
+    if let Some(sp) = sp {
+        spinner::finish_ok(&sp, "Rule created");
+    }
+
     match mode {
         OutputMode::Json => print_json(&created)?,
         OutputMode::Human => {
-            print_success("Rule created");
-            print_info("ID", created["id"].as_str().unwrap_or("-"));
+            theme::print_kv("ID", created["id"].as_str().unwrap_or("-"));
         }
     }
 
@@ -140,6 +172,11 @@ async fn create(base: &str, args: CreateArgs, mode: OutputMode) -> Result<()> {
 async fn update(base: &str, args: UpdateArgs, mode: OutputMode) -> Result<()> {
     let body = parse_json_data(&args.data)?;
     let url = format!("{base}/v1/rules/{}", args.id);
+
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Updating rule...")),
+        OutputMode::Json => None,
+    };
 
     let client = reqwest::Client::new();
     let resp = client
@@ -151,16 +188,32 @@ async fn update(base: &str, args: UpdateArgs, mode: OutputMode) -> Result<()> {
 
     let updated: serde_json::Value = resp.json().await?;
 
-    match mode {
-        OutputMode::Json => print_json(&updated)?,
-        OutputMode::Human => print_success(&format!("Rule {} updated", args.id)),
+    if let Some(sp) = sp {
+        spinner::finish_ok(&sp, &format!("Rule {} updated", args.id));
+    }
+
+    if mode == OutputMode::Json {
+        print_json(&updated)?;
     }
 
     Ok(())
 }
 
 async fn delete(base: &str, args: DeleteArgs, mode: OutputMode) -> Result<()> {
+    if mode == OutputMode::Human && !args.yes {
+        let msg = format!("Delete rule '{}'?", args.id);
+        if !confirm::confirm_action(&msg) {
+            theme::print_dim("  Cancelled.");
+            return Ok(());
+        }
+    }
+
     let url = format!("{base}/v1/rules/{}", args.id);
+
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Deleting rule...")),
+        OutputMode::Json => None,
+    };
 
     let client = reqwest::Client::new();
     client
@@ -169,9 +222,12 @@ async fn delete(base: &str, args: DeleteArgs, mode: OutputMode) -> Result<()> {
         .await?
         .error_for_status()?;
 
-    match mode {
-        OutputMode::Json => print_json(&serde_json::json!({"deleted": true, "id": args.id}))?,
-        OutputMode::Human => print_success(&format!("Rule {} deleted", args.id)),
+    if let Some(sp) = sp {
+        spinner::finish_ok(&sp, &format!("Rule '{}' deleted", args.id));
+    }
+
+    if mode == OutputMode::Json {
+        print_json(&serde_json::json!({"deleted": true, "id": args.id}))?;
     }
 
     Ok(())

@@ -4,7 +4,7 @@ use tonic::transport::Channel;
 
 use sentinel_common::proto::agent_service_client::AgentServiceClient;
 use sentinel_common::proto::RegisterRequest;
-use crate::output::{OutputMode, print_json, print_success, print_info};
+use crate::output::{OutputMode, print_json, print_info, spinner, theme};
 
 #[derive(Args)]
 pub struct RegisterArgs {
@@ -35,11 +35,20 @@ pub async fn execute(
         config_path.as_deref(),
     )?;
 
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Connecting to server...")),
+        OutputMode::Json => None,
+    };
+
     let channel = Channel::from_shared(endpoint.clone())
         .context("invalid endpoint")?
         .connect()
         .await
         .context("failed to connect to server")?;
+
+    if let Some(sp) = &sp {
+        sp.set_message("Registering agent...");
+    }
 
     let mut client = AgentServiceClient::new(channel);
 
@@ -61,13 +70,18 @@ pub async fn execute(
         save_credentials(&response.agent_id, &response.secret)?;
     }
 
+    if let Some(sp) = sp {
+        spinner::finish_ok(&sp, "Agent registered successfully");
+    }
+
     match mode {
         OutputMode::Json => print_json(&out)?,
         OutputMode::Human => {
-            print_success("Agent registered successfully");
-            print_info("Agent ID", &out.agent_id);
-            print_info("Secret", &out.secret);
+            theme::print_section("Credentials");
+            theme::print_kv("Agent ID", &out.agent_id);
+            theme::print_kv("Secret", &out.secret);
             if args.save {
+                println!();
                 print_info("Saved", "credentials stored locally");
             }
         }

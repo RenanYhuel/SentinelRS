@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use crate::output::{OutputMode, print_json, print_success, print_error, print_info};
+use crate::output::{OutputMode, print_json, print_success, print_error, theme};
 use super::helpers;
 
 #[derive(Subcommand)]
@@ -31,22 +31,33 @@ fn show(_args: ShowArgs, mode: OutputMode, config_path: Option<String>) -> Resul
     match mode {
         OutputMode::Json => print_json(&serde_json::to_value(&cfg)?)?,
         OutputMode::Human => {
-            print_success("Agent configuration:");
-            print_info("Agent ID", &cfg.agent_id.as_deref().unwrap_or("<not set>"));
-            print_info("Server", &cfg.server);
-            print_info("Collect interval", &format!("{}s", cfg.collect.interval_seconds));
-            print_info("CPU", &cfg.collect.metrics.cpu.to_string());
-            print_info("Memory", &cfg.collect.metrics.mem.to_string());
-            print_info("Disk", &cfg.collect.metrics.disk.to_string());
-            print_info("Plugins dir", &cfg.plugins_dir);
-            print_info("WAL dir", &cfg.buffer.wal_dir);
-            print_info("Segment size", &format!("{} MB", cfg.buffer.segment_size_mb));
-            print_info("Retention", &format!("{} days", cfg.buffer.max_retention_days));
-            print_info("Key store", &cfg.security.key_store);
-            print_info(
+            theme::print_header("Agent Configuration");
+
+            theme::print_section("Identity");
+            theme::print_kv("Agent ID", cfg.agent_id.as_deref().unwrap_or("<not set>"));
+            theme::print_kv("Server", &cfg.server);
+
+            theme::print_section("Collection");
+            theme::print_kv("Interval", &format!("{}s", cfg.collect.interval_seconds));
+            theme::print_kv_colored("CPU", &cfg.collect.metrics.cpu.to_string(), cfg.collect.metrics.cpu);
+            theme::print_kv_colored("Memory", &cfg.collect.metrics.mem.to_string(), cfg.collect.metrics.mem);
+            theme::print_kv_colored("Disk", &cfg.collect.metrics.disk.to_string(), cfg.collect.metrics.disk);
+
+            theme::print_section("Plugins");
+            theme::print_kv("Directory", &cfg.plugins_dir);
+
+            theme::print_section("Buffer (WAL)");
+            theme::print_kv("Directory", &cfg.buffer.wal_dir);
+            theme::print_kv("Segment size", &format!("{} MB", cfg.buffer.segment_size_mb));
+            theme::print_kv("Retention", &format!("{} days", cfg.buffer.max_retention_days));
+
+            theme::print_section("Security");
+            theme::print_kv("Key store", &cfg.security.key_store);
+            theme::print_kv(
                 "Rotation check",
                 &format!("every {} hours", cfg.security.rotation_check_interval_hours),
             );
+            println!();
         }
     }
 
@@ -55,22 +66,18 @@ fn show(_args: ShowArgs, mode: OutputMode, config_path: Option<String>) -> Resul
 
 fn validate(_args: ValidateArgs, mode: OutputMode, config_path: Option<String>) -> Result<()> {
     match helpers::load_config(config_path.as_deref()) {
-        Ok(_cfg) => {
-            match mode {
-                OutputMode::Json => {
-                    print_json(&serde_json::json!({"valid": true}))?;
-                }
-                OutputMode::Human => print_success("Configuration is valid"),
+        Ok(_cfg) => match mode {
+            OutputMode::Json => {
+                print_json(&serde_json::json!({"valid": true}))?;
             }
-        }
-        Err(e) => {
-            match mode {
-                OutputMode::Json => {
-                    print_json(&serde_json::json!({"valid": false, "error": e.to_string()}))?;
-                }
-                OutputMode::Human => print_error(&format!("Invalid configuration: {e}")),
+            OutputMode::Human => print_success("Configuration is valid"),
+        },
+        Err(e) => match mode {
+            OutputMode::Json => {
+                print_json(&serde_json::json!({"valid": false, "error": e.to_string()}))?;
             }
-        }
+            OutputMode::Human => print_error(&format!("Invalid configuration: {e}")),
+        },
     }
 
     Ok(())

@@ -6,13 +6,15 @@ use sentinel_agent::batch::BatchComposer;
 use sentinel_agent::buffer::Wal;
 use sentinel_agent::exporter::GrpcClient;
 use sentinel_common::proto::push_response::Status;
-use crate::output::{OutputMode, print_json, print_success, print_info};
+use crate::output::{OutputMode, print_json, spinner, progress, theme, confirm};
 use super::helpers;
 
 #[derive(Args)]
 pub struct ForceSendArgs {
     #[arg(long, help = "Max batches to send (0 = all)")]
     limit: Option<usize>,
+    #[arg(long, help = "Skip confirmation prompt")]
+    yes: bool,
 }
 
 pub async fn execute(
@@ -30,7 +32,7 @@ pub async fn execute(
     if entries.is_empty() {
         match mode {
             OutputMode::Json => print_json(&serde_json::json!({"sent": 0}))?,
-            OutputMode::Human => print_success("No unacked entries to send"),
+            OutputMode::Human => theme::print_dim("  No unacked entries to send"),
         }
         return Ok(());
     }
@@ -42,6 +44,14 @@ pub async fn execute(
         entries
     };
 
+    if mode == OutputMode::Human && !args.yes {
+        let msg = format!("Send {} batch(es) to server?", to_send.len());
+        if !confirm::confirm_default_yes(&msg) {
+            theme::print_dim("  Cancelled.");
+            return Ok(());
+        }
+    }
+
     let creds = load_credentials()?;
 
     let secret = base64::Engine::decode(
@@ -49,6 +59,11 @@ pub async fn execute(
         &creds.secret,
     )
     .context("invalid base64 secret")?;
+
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Connecting to server...")),
+        OutputMode::Json => None,
+    };
 
     let mut client = GrpcClient::connect(
         endpoint,
@@ -59,6 +74,15 @@ pub async fn execute(
     .await
     .context("failed to connect")?;
 
+    if let Some(sp) = &sp {
+        spinner::finish_clear(sp);
+    }
+
+    let pb = match mode {
+        OutputMode::Human => Some(progress::create(to_send.len() as u64, "Sending batches")),
+        OutputMode::Json => None,
+    };
+
     let mut sent = 0u64;
     let mut failed = 0u64;
 
@@ -67,6 +91,9 @@ pub async fn execute(
             Ok(b) => b,
             Err(_) => {
                 failed += 1;
+                if let Some(pb) = &pb {
+                    pb.inc(1);
+                }
                 continue;
             }
         };
@@ -89,9 +116,17 @@ pub async fn execute(
                 failed += 1;
             }
         }
+
+        if let Some(pb) = &pb {
+            pb.inc(1);
+        }
     }
 
     wal.save_meta()?;
+
+    if let Some(pb) = pb {
+        progress::finish(&pb, "All batches processed");
+    }
 
     match mode {
         OutputMode::Json => print_json(&serde_json::json!({
@@ -100,10 +135,10 @@ pub async fn execute(
             "total": to_send.len(),
         }))?,
         OutputMode::Human => {
-            print_success(&format!("Force send complete"));
-            print_info("Sent", &sent.to_string());
-            print_info("Failed", &failed.to_string());
-            print_info("Total", &to_send.len().to_string());
+            println!();
+            theme::print_kv("Sent", &sent.to_string());
+            theme::print_kv("Failed", &failed.to_string());
+            theme::print_kv("Total", &to_send.len().to_string());
         }
     }
 

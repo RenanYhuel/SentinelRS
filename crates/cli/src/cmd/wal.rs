@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use sentinel_agent::buffer::{compact, compute_stats, needs_compaction, Wal, WalMeta};
 use sentinel_agent::batch::BatchComposer;
-use crate::output::{OutputMode, print_json, print_success, print_info, build_table};
+use crate::output::{OutputMode, print_json, print_success, build_table, spinner, theme, confirm};
 use super::helpers;
 
 #[derive(Subcommand)]
@@ -20,14 +20,16 @@ pub struct WalStatsArgs;
 
 #[derive(clap::Args)]
 pub struct InspectArgs {
-    #[arg(long, default_value = "20", help = "Max number of entries to show")]
+    #[arg(long, default_value = "20")]
     limit: usize,
 }
 
 #[derive(clap::Args)]
 pub struct CompactArgs {
-    #[arg(long, help = "Force even if threshold not reached")]
+    #[arg(long)]
     force: bool,
+    #[arg(long, help = "Skip confirmation prompt")]
+    yes: bool,
 }
 
 #[derive(clap::Args)]
@@ -60,10 +62,15 @@ fn stats(_args: WalStatsArgs, mode: OutputMode, config_path: Option<String>) -> 
             "unacked_count": s.unacked_count,
         }))?,
         OutputMode::Human => {
-            print_success("WAL statistics:");
-            print_info("Total size", &format_bytes(s.total_size_bytes));
-            print_info("Segments", &s.segment_count.to_string());
-            print_info("Unacked entries", &s.unacked_count.to_string());
+            theme::print_header("WAL Statistics");
+            theme::print_kv("Total size", &format_bytes(s.total_size_bytes));
+            theme::print_kv("Segments", &s.segment_count.to_string());
+            theme::print_kv_colored(
+                "Unacked",
+                &s.unacked_count.to_string(),
+                s.unacked_count == 0,
+            );
+            println!();
         }
     }
 
@@ -74,7 +81,6 @@ fn inspect(args: InspectArgs, mode: OutputMode, config_path: Option<String>) -> 
     let dir = wal_dir(config_path.as_deref())?;
     let wal = Wal::open(&dir, false, 16 * 1024 * 1024)?;
     let entries = wal.iter_unacked()?;
-
     let limited: Vec<_> = entries.into_iter().take(args.limit).collect();
 
     match mode {
@@ -100,6 +106,7 @@ fn inspect(args: InspectArgs, mode: OutputMode, config_path: Option<String>) -> 
                 return Ok(());
             }
 
+            theme::print_header("WAL Entries");
             let mut table = build_table(&["Record ID", "Size", "Batch ID", "Metrics"]);
             for (id, data) in &limited {
                 let batch = BatchComposer::decode_batch(data).ok();
@@ -107,7 +114,10 @@ fn inspect(args: InspectArgs, mode: OutputMode, config_path: Option<String>) -> 
                     id.to_string(),
                     format_bytes(data.len() as u64),
                     batch.as_ref().map(|b| b.batch_id.clone()).unwrap_or_default(),
-                    batch.as_ref().map(|b| b.metrics.len().to_string()).unwrap_or_default(),
+                    batch
+                        .as_ref()
+                        .map(|b| b.metrics.len().to_string())
+                        .unwrap_or_default(),
                 ]);
             }
             println!("{table}");
@@ -132,13 +142,28 @@ fn compact_cmd(args: CompactArgs, mode: OutputMode, config_path: Option<String>)
         }
     }
 
+    if mode == OutputMode::Human && !args.yes {
+        if !confirm::confirm_action("Compact WAL? This rewrites segment files.") {
+            theme::print_dim("  Cancelled.");
+            return Ok(());
+        }
+    }
+
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Compacting WAL...")),
+        OutputMode::Json => None,
+    };
+
     let meta = WalMeta::load(&dir)?;
     let new_meta = compact(&dir, &meta)?;
     new_meta.save(&dir)?;
 
-    match mode {
-        OutputMode::Json => print_json(&serde_json::json!({"compacted": true}))?,
-        OutputMode::Human => print_success("WAL compacted successfully"),
+    if let Some(sp) = sp {
+        spinner::finish_ok(&sp, "WAL compacted successfully");
+    }
+
+    if mode == OutputMode::Json {
+        print_json(&serde_json::json!({"compacted": true}))?;
     }
 
     Ok(())
@@ -156,11 +181,12 @@ fn meta(_args: MetaArgs, mode: OutputMode, config_path: Option<String>) -> Resul
             "acked_count": m.acked_ids.len(),
         }))?,
         OutputMode::Human => {
-            print_success("WAL metadata:");
-            print_info("Head seq", &m.head_seq.to_string());
-            print_info("Tail seq", &m.tail_seq.to_string());
-            print_info("Last segment", &m.last_segment.to_string());
-            print_info("Acked IDs", &m.acked_ids.len().to_string());
+            theme::print_header("WAL Metadata");
+            theme::print_kv("Head seq", &m.head_seq.to_string());
+            theme::print_kv("Tail seq", &m.tail_seq.to_string());
+            theme::print_kv("Last segment", &m.last_segment.to_string());
+            theme::print_kv("Acked IDs", &m.acked_ids.len().to_string());
+            println!();
         }
     }
 

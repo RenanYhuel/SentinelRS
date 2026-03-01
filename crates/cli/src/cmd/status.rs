@@ -3,7 +3,7 @@ use clap::Args;
 use std::path::PathBuf;
 
 use sentinel_agent::buffer::{compute_stats, Wal};
-use crate::output::{OutputMode, print_json, print_success, print_info};
+use crate::output::{OutputMode, print_json, spinner, theme};
 use super::helpers;
 
 #[derive(Args)]
@@ -18,10 +18,27 @@ pub async fn execute(
     let cfg = helpers::load_config(config_path.as_deref()).ok();
     let rest_base = helpers::resolve_rest_url(server.as_deref(), config_path.as_deref()).ok();
 
+    if mode == OutputMode::Human {
+        theme::print_header("SentinelRS Status");
+    }
+
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Checking server connectivity...")),
+        OutputMode::Json => None,
+    };
+
     let server_up = match &rest_base {
         Some(url) => reqwest::get(&format!("{url}/healthz")).await.is_ok(),
         None => false,
     };
+
+    if let Some(sp) = sp {
+        if server_up {
+            spinner::finish_ok(&sp, "Server reachable");
+        } else {
+            spinner::finish_err(&sp, "Server unreachable");
+        }
+    }
 
     let wal_info = cfg.as_ref().and_then(|c| {
         let dir = PathBuf::from(&c.buffer.wal_dir);
@@ -46,19 +63,25 @@ pub async fn execute(
             })),
         }))?,
         OutputMode::Human => {
-            print_success("SentinelRS Status");
-            print_info("Agent ID", &agent_id);
-            if server_up {
-                print_info("Server", "reachable");
-            } else {
-                print_info("Server", "unreachable");
-            }
+            println!();
+            theme::print_section("Agent");
+            theme::print_kv("Agent ID", &agent_id);
+
+            theme::print_section("Server");
+            theme::print_kv_colored("Status", if server_up { "online" } else { "offline" }, server_up);
+
+            theme::print_section("WAL");
             if let Some(w) = &wal_info {
-                print_info("WAL segments", &w.segment_count.to_string());
-                print_info("WAL unacked", &w.unacked_count.to_string());
+                theme::print_kv("Segments", &w.segment_count.to_string());
+                theme::print_kv_colored(
+                    "Unacked",
+                    &w.unacked_count.to_string(),
+                    w.unacked_count == 0,
+                );
             } else {
-                print_info("WAL", "unavailable");
+                theme::print_kv_colored("Status", "unavailable", false);
             }
+            println!();
         }
     }
 

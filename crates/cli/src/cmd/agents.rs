@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 
-use crate::output::{OutputMode, print_json, print_success, print_info, build_table};
+use crate::output::{OutputMode, print_json, print_success, build_table, spinner, theme};
 use super::helpers;
 
 #[derive(Subcommand)]
@@ -36,6 +36,11 @@ async fn list(
     let base = helpers::resolve_rest_url(server.as_deref(), config_path.as_deref())?;
     let url = format!("{base}/v1/agents");
 
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Fetching agents...")),
+        OutputMode::Json => None,
+    };
+
     let resp = reqwest::get(&url)
         .await
         .context("failed to reach server")?
@@ -44,6 +49,10 @@ async fn list(
 
     let agents: Vec<serde_json::Value> = resp.json().await?;
 
+    if let Some(sp) = sp {
+        spinner::finish_clear(&sp);
+    }
+
     match mode {
         OutputMode::Json => print_json(&agents)?,
         OutputMode::Human => {
@@ -51,6 +60,7 @@ async fn list(
                 print_success("No agents registered");
                 return Ok(());
             }
+            theme::print_header("Agents");
             let mut table = build_table(&["Agent ID", "HW ID", "Version", "Last Seen"]);
             for a in &agents {
                 table.add_row(vec![
@@ -76,6 +86,11 @@ async fn get(
     let base = helpers::resolve_rest_url(server.as_deref(), config_path.as_deref())?;
     let url = format!("{base}/v1/agents/{}", args.id);
 
+    let sp = match mode {
+        OutputMode::Human => Some(spinner::create("Fetching agent details...")),
+        OutputMode::Json => None,
+    };
+
     let resp = reqwest::get(&url)
         .await
         .context("failed to reach server")?
@@ -84,14 +99,19 @@ async fn get(
 
     let agent: serde_json::Value = resp.json().await?;
 
+    if let Some(sp) = sp {
+        spinner::finish_clear(&sp);
+    }
+
     match mode {
         OutputMode::Json => print_json(&agent)?,
         OutputMode::Human => {
-            print_success("Agent details:");
-            print_info("Agent ID", agent["agent_id"].as_str().unwrap_or("-"));
-            print_info("HW ID", agent["hw_id"].as_str().unwrap_or("-"));
-            print_info("Version", agent["agent_version"].as_str().unwrap_or("-"));
-            print_info("Last Seen", agent["last_heartbeat"].as_str().unwrap_or("-"));
+            theme::print_header("Agent Details");
+            theme::print_kv("Agent ID", agent["agent_id"].as_str().unwrap_or("-"));
+            theme::print_kv("HW ID", agent["hw_id"].as_str().unwrap_or("-"));
+            theme::print_kv("Version", agent["agent_version"].as_str().unwrap_or("-"));
+            theme::print_kv("Last Seen", agent["last_heartbeat"].as_str().unwrap_or("-"));
+            println!();
         }
     }
 

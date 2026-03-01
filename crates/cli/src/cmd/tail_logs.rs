@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Args;
+use colored::Colorize;
 use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
@@ -8,7 +9,7 @@ pub struct TailLogsArgs {
     #[arg(long, help = "Path to log file")]
     file: Option<String>,
 
-    #[arg(long, default_value = "20", help = "Number of lines to show initially")]
+    #[arg(long, default_value = "20")]
     lines: usize,
 
     #[arg(long, help = "Follow the log output")]
@@ -30,7 +31,7 @@ pub async fn execute(args: TailLogsArgs) -> Result<()> {
     let start = all_lines.len().saturating_sub(args.lines);
 
     for line in &all_lines[start..] {
-        println!("{line}");
+        println!("{}", colorize_log_line(line));
     }
 
     if args.follow {
@@ -43,7 +44,7 @@ pub async fn execute(args: TailLogsArgs) -> Result<()> {
 
         while let Some(line) = lines.next_line().await? {
             if current >= skip {
-                println!("{line}");
+                println!("{}", colorize_log_line(&line));
             }
             current += 1;
         }
@@ -56,7 +57,7 @@ pub async fn execute(args: TailLogsArgs) -> Result<()> {
             let mut idx = 0;
             while let Some(line) = lines.next_line().await? {
                 if idx >= current {
-                    println!("{line}");
+                    println!("{}", colorize_log_line(&line));
                     current = idx + 1;
                 }
                 idx += 1;
@@ -65,6 +66,21 @@ pub async fn execute(args: TailLogsArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn colorize_log_line(line: &str) -> String {
+    let lower = line.to_lowercase();
+    if lower.contains("error") || lower.contains("err]") || lower.contains("fatal") {
+        line.red().bold().to_string()
+    } else if lower.contains("warn") {
+        line.yellow().to_string()
+    } else if lower.contains("info") {
+        line.cyan().to_string()
+    } else if lower.contains("debug") || lower.contains("trace") {
+        line.dimmed().to_string()
+    } else {
+        line.to_string()
+    }
 }
 
 fn default_log_path() -> PathBuf {
