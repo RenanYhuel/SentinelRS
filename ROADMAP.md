@@ -18,8 +18,8 @@ Index (sections)
 - [ ]   2. Protobuf & common types
 - [ ]   3. Agent — architecture interne (sous-tâches)
 - [x]   4. Plugins WASM
-- [ ]   5. WAL (buffer local) et politiques de compaction
-- [ ]   6. Exporter gRPC & Prometheus
+- [x]   5. WAL (buffer local) et politiques de compaction
+- [x]   6. Exporter gRPC & Prometheus
 - [ ]   7. Server (API gateway / ingestion)
 - [ ]   8. Broker integration (NATS JetStream)
 - [ ]   9. Workers (consommation / transformation / stockage)
@@ -155,11 +155,11 @@ Notes : Prefer passer un contexte minimal au plugin pour réduire la surface d'a
 
 6. Exporter gRPC & Prometheus (Agent ↔ Server)
 
-- [ ] 6.1. Implement tonic client based on `crates/common` proto.
-- [ ] 6.2. Add metadata injection and interceptors for signature header.
-- [ ] 6.3. Implement retry logic with exponential backoff and jitter; config options for max attempts or unlimited with local WAL retention.
-- [ ] 6.4. Add HTTP fallback (POST /v1/agent/metrics) for environments where gRPC is blocked.
-- [ ] Tests : integration with server stub + NATS stub (or test double).
+- [x] 6.1. Implement tonic client based on `crates/common` proto.
+- [x] 6.2. Add metadata injection and interceptors for signature header.
+- [x] 6.3. Implement retry logic with exponential backoff and jitter; config options for max attempts or unlimited with local WAL retention.
+- [x] 6.4. Add HTTP fallback (POST /v1/agent/metrics) for environments where gRPC is blocked.
+- [x] Tests : integration with server stub + NATS stub (or test double).
 
 ---
 
