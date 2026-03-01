@@ -1,0 +1,149 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux-musl:
+    name: Linux (musl static)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - name: Install musl-tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-linux-musl-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: release-linux-musl-
+      - run: cargo build --release --target x86_64-unknown-linux-musl
+      - name: Package
+        run: |
+          mkdir -p dist
+          for bin in sentinel_agent sentinel_server sentinel_workers sentinel_cli; do
+            cp target/x86_64-unknown-linux-musl/release/$bin dist/
+          done
+          cd dist && tar czf ../sentinel-linux-x86_64-musl.tar.gz *
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-musl
+          path: sentinel-linux-x86_64-musl.tar.gz
+
+  build-windows:
+    name: Windows (MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-windows-msvc-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: release-windows-msvc-
+      - run: cargo build --release --target x86_64-pc-windows-msvc
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          $bins = @("sentinel_agent", "sentinel_server", "sentinel_workers", "sentinel_cli")
+          foreach ($b in $bins) {
+            Copy-Item "target/x86_64-pc-windows-msvc/release/$b.exe" "dist/"
+          }
+          Compress-Archive -Path dist/* -DestinationPath sentinel-windows-x86_64-msvc.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-msvc
+          path: sentinel-windows-x86_64-msvc.zip
+
+  build-macos:
+    name: macOS (universal)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-macos-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: release-macos-
+      - name: Build x86_64
+        run: cargo build --release --target x86_64-apple-darwin
+      - name: Build aarch64
+        run: cargo build --release --target aarch64-apple-darwin
+      - name: Create universal binaries
+        run: |
+          mkdir -p dist
+          for bin in sentinel_agent sentinel_server sentinel_workers sentinel_cli; do
+            lipo -create \
+              target/x86_64-apple-darwin/release/$bin \
+              target/aarch64-apple-darwin/release/$bin \
+              -output dist/$bin
+          done
+          cd dist && tar czf ../sentinel-macos-universal.tar.gz *
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: sentinel-macos-universal.tar.gz
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-linux-musl, build-windows, build-macos]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          find . -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec sha256sum {} \; | sort > ../SHA256SUMS.txt
+      - name: Sign checksums (GPG)
+        if: env.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "$GPG_PASSPHRASE" \
+            --detach-sign --armor SHA256SUMS.txt
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          ASSETS=""
+          for f in artifacts/**/*.tar.gz artifacts/**/*.zip; do
+            ASSETS="$ASSETS $f"
+          done
+          ASSETS="$ASSETS SHA256SUMS.txt"
+          if [ -f SHA256SUMS.txt.asc ]; then
+            ASSETS="$ASSETS SHA256SUMS.txt.asc"
+          fi
+          gh release create "$TAG" $ASSETS \
+            --title "$TAG" \
+            --generate-notes

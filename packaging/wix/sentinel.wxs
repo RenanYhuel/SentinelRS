@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="SentinelRS"
+    Language="1033"
+    Version="$(var.Version)"
+    Manufacturer="SentinelRS Team"
+    UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
+
+    <Package
+      InstallerVersion="500"
+      Compressed="yes"
+      InstallScope="perMachine"
+      Description="SentinelRS monitoring platform"
+      Manufacturer="SentinelRS Team" />
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="Complete" Title="SentinelRS" Level="1">
+      <ComponentGroupRef Id="Binaries" />
+      <ComponentGroupRef Id="Config" />
+      <ComponentRef Id="PathEntry" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="SentinelRS">
+          <Directory Id="BinFolder" Name="bin" />
+          <Directory Id="ConfigFolder" Name="config" />
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <ComponentGroup Id="Binaries" Directory="BinFolder">
+      <Component Id="AgentExe" Guid="*">
+        <File Id="sentinel_agent.exe" Source="$(var.BinDir)\sentinel_agent.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="ServerExe" Guid="*">
+        <File Id="sentinel_server.exe" Source="$(var.BinDir)\sentinel_server.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="WorkersExe" Guid="*">
+        <File Id="sentinel_workers.exe" Source="$(var.BinDir)\sentinel_workers.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="CliExe" Guid="*">
+        <File Id="sentinel_cli.exe" Source="$(var.BinDir)\sentinel_cli.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="Config" Directory="ConfigFolder">
+      <Component Id="ExampleConfig" Guid="*">
+        <File Id="config.example.yml" Source="$(var.RootDir)\config.example.yml" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Component Id="PathEntry" Directory="BinFolder" Guid="*">
+      <Environment
+        Id="PATH"
+        Name="PATH"
+        Value="[BinFolder]"
+        Permanent="no"
+        Part="last"
+        Action="set"
+        System="yes" />
+    </Component>
+  </Product>
+</Wix>

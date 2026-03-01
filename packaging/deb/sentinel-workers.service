@@ -1,0 +1,13 @@
+[Unit]
+Description=SentinelRS Workers
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/sentinel_workers
+Restart=on-failure
+RestartSec=5
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=multi-user.target

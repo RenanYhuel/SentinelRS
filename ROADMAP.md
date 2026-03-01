@@ -274,10 +274,10 @@ Notes : Use TimescaleDB native functions for downsampling & continuous aggregate
 
 14. CI / Releases / Packaging
 
-- [ ] 14.1. GitHub Actions pipeline skeleton: fmt -> clippy -> unit tests -> build artifacts for linux/windows/macos -> run integration smoke (docker-compose).
-- [ ] 14.2. Add release job building static linux binary (musl), Windows MSVC, macOS universal; produce GitHub Release artifacts.
-- [ ] 14.3. Packaging scripts: `cargo-deb` config, WiX templates, macOS bundle script.
-- [ ] 14.4. Sign artifacts where possible (GPG, code signing placeholders).
+- [x] 14.1. GitHub Actions pipeline skeleton: fmt -> clippy -> unit tests -> build artifacts for linux/windows/macos -> run integration smoke (docker-compose).
+- [x] 14.2. Add release job building static linux binary (musl), Windows MSVC, macOS universal; produce GitHub Release artifacts.
+- [x] 14.3. Packaging scripts: `cargo-deb` config, WiX templates, macOS bundle script.
+- [x] 14.4. Sign artifacts where possible (GPG, code signing placeholders).
 
 ---
 

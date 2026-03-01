@@ -1,0 +1,16 @@
+[package.metadata.deb]
+maintainer = "SentinelRS Team"
+copyright = "2025 SentinelRS"
+depends = "$auto"
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/release/sentinel_agent", "usr/bin/", "755"],
+    ["target/release/sentinel_server", "usr/bin/", "755"],
+    ["target/release/sentinel_workers", "usr/bin/", "755"],
+    ["target/release/sentinel_cli", "usr/bin/sentinel", "755"],
+    ["config.example.yml", "etc/sentinel/config.example.yml", "644"],
+    ["packaging/deb/sentinel-agent.service", "lib/systemd/system/", "644"],
+    ["packaging/deb/sentinel-server.service", "lib/systemd/system/", "644"],
+    ["packaging/deb/sentinel-workers.service", "lib/systemd/system/", "644"],
+]
