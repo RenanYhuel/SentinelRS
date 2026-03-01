@@ -59,10 +59,7 @@ pub async fn run(config: AgentConfig) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-fn spawn_collector(
-    interval_secs: u64,
-    tx: mpsc::Sender<Vec<sentinel_common::proto::Metric>>,
-) {
+fn spawn_collector(interval_secs: u64, tx: mpsc::Sender<Vec<sentinel_common::proto::Metric>>) {
     let collector = Arc::new(SystemCollector::new());
     let _handle = ScheduledTask {
         interval: Duration::from_secs(interval_secs),

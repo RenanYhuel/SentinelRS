@@ -11,8 +11,6 @@ pub async fn wait_for_shutdown() {
 
     #[cfg(not(unix))]
     {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("ctrl-c handler");
+        tokio::signal::ctrl_c().await.expect("ctrl-c handler");
     }
 }
