@@ -62,14 +62,9 @@ pub async fn execute(
         OutputMode::Json => None,
     };
 
-    let mut client = GrpcClient::connect(
-        endpoint,
-        creds.agent_id.clone(),
-        &secret,
-        "default".to_string(),
-    )
-    .await
-    .context("failed to connect")?;
+    let mut client = GrpcClient::connect(endpoint, creds.agent_id.clone(), &secret, None)
+        .await
+        .context("failed to connect")?;
 
     if let Some(sp) = &sp {
         spinner::finish_clear(sp);

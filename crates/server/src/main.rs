@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use sentinel_server::broker::{connect_jetstream, ensure_stream, NatsPublisher};
 use sentinel_server::config::ServerConfig;
 use sentinel_server::grpc::AgentServiceImpl;
 use sentinel_server::metrics::server_metrics::ServerMetrics;
+use sentinel_server::persistence::{create_pool, AgentRepo};
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
 use sentinel_server::tls::TlsIdentity;
@@ -37,12 +40,38 @@ async fn main() {
     let broker = NatsPublisher::new(js);
     let server_metrics = ServerMetrics::new();
 
+    let agent_repo = match config.database_url {
+        Some(ref url) => {
+            let pool = create_pool(url, 10)
+                .await
+                .expect("failed to connect to PostgreSQL");
+            tracing::info!("connected to PostgreSQL");
+
+            let repo = Arc::new(AgentRepo::new(pool));
+            match repo.load_all(&agents).await {
+                Ok(n) => tracing::info!(count = n, "loaded agents from database"),
+                Err(e) => tracing::error!(error = %e, "failed to load agents from database"),
+            }
+            Some(repo)
+        }
+        None => {
+            tracing::warn!("no DATABASE_URL configured, agent store is in-memory only");
+            None
+        }
+    };
+
     let tls_identity = config
         .tls
         .as_ref()
         .map(|tls_cfg| TlsIdentity::load(tls_cfg).expect("failed to load TLS certificates"));
 
-    let grpc_service = AgentServiceImpl::new(agents.clone(), idempotency, broker);
+    let grpc_service = {
+        let svc = AgentServiceImpl::new(agents.clone(), idempotency, broker);
+        match agent_repo {
+            Some(repo) => svc.with_repo(repo),
+            None => svc,
+        }
+    };
     let grpc_addr = config.grpc_addr;
 
     let grpc_tls = tls_identity.as_ref().map(|id| {

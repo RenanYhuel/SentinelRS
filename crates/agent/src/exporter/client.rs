@@ -10,7 +10,7 @@ pub struct GrpcClient {
     client: AgentServiceClient<Channel>,
     agent_id: String,
     signer: HmacSigner,
-    key_id: String,
+    key_id: Option<String>,
 }
 
 impl GrpcClient {
@@ -18,7 +18,7 @@ impl GrpcClient {
         endpoint: &str,
         agent_id: String,
         secret: &[u8],
-        key_id: String,
+        key_id: Option<String>,
     ) -> Result<Self, tonic::transport::Error> {
         let channel = Channel::from_shared(endpoint.to_string())
             .expect("valid endpoint")
@@ -45,7 +45,10 @@ impl GrpcClient {
             MetadataValue::try_from(&self.agent_id).unwrap(),
         );
         metadata.insert("x-signature", MetadataValue::try_from(&signature).unwrap());
-        metadata.insert("x-key-id", MetadataValue::try_from(&self.key_id).unwrap());
+
+        if let Some(ref kid) = self.key_id {
+            metadata.insert("x-key-id", MetadataValue::try_from(kid).unwrap());
+        }
 
         self.client
             .push_metrics(request)
