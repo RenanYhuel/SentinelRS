@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 
 use super::helpers;
-use crate::output::{build_table, print_json, print_success, spinner, theme, OutputMode};
+use crate::output::{build_table, print_json, print_success, spinner, theme, time_ago, OutputMode};
 
 #[derive(Subcommand)]
 pub enum AgentsCmd {
@@ -59,11 +59,15 @@ async fn list(mode: OutputMode, server: Option<String>, config_path: Option<Stri
             theme::print_header("Agents");
             let mut table = build_table(&["Agent ID", "HW ID", "Version", "Last Seen"]);
             for a in &agents {
+                let last_seen = a["last_seen"]
+                    .as_str()
+                    .map(time_ago::format_relative)
+                    .unwrap_or_else(|| "-".into());
                 table.add_row(vec![
                     a["agent_id"].as_str().unwrap_or("-"),
                     a["hw_id"].as_str().unwrap_or("-"),
                     a["agent_version"].as_str().unwrap_or("-"),
-                    a["last_heartbeat"].as_str().unwrap_or("-"),
+                    &last_seen,
                 ]);
             }
             println!("{table}");
@@ -106,7 +110,11 @@ async fn get(
             theme::print_kv("Agent ID", agent["agent_id"].as_str().unwrap_or("-"));
             theme::print_kv("HW ID", agent["hw_id"].as_str().unwrap_or("-"));
             theme::print_kv("Version", agent["agent_version"].as_str().unwrap_or("-"));
-            theme::print_kv("Last Seen", agent["last_heartbeat"].as_str().unwrap_or("-"));
+            let last_seen = agent["last_seen"]
+                .as_str()
+                .map(time_ago::format_relative)
+                .unwrap_or_else(|| "-".into());
+            theme::print_kv("Last Seen", &last_seen);
             println!();
         }
     }
