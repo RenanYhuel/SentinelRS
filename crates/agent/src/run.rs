@@ -108,7 +108,7 @@ fn spawn_sender(
                     loop {
                         tokio::time::sleep(Duration::from_secs(5)).await;
                         let mut w = wal.lock().await;
-                        match send_loop.send_pending(&mut *w, &mut client).await {
+                        match send_loop.send_pending(&mut w, &mut client).await {
                             Ok(n) if n > 0 => {
                                 for _ in 0..n {
                                     state.increment_batches_sent();

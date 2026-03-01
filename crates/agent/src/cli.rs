@@ -6,6 +6,7 @@ pub struct Args {
 
 pub fn parse() -> Args {
     let mut args = std::env::args().skip(1);
+    let mut config_path = None;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -26,9 +27,7 @@ pub fn parse() -> Args {
                     eprintln!("error: --config requires a path argument");
                     std::process::exit(1);
                 });
-                return Args {
-                    config_path: PathBuf::from(path),
-                };
+                config_path = Some(PathBuf::from(path));
             }
             other => {
                 eprintln!("error: unknown argument '{other}'");
@@ -37,6 +36,11 @@ pub fn parse() -> Args {
         }
     }
 
-    eprintln!("error: --config <path> is required");
-    std::process::exit(1);
+    match config_path {
+        Some(p) => Args { config_path: p },
+        None => {
+            eprintln!("error: --config <path> is required");
+            std::process::exit(1);
+        }
+    }
 }
