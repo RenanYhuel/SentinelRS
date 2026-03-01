@@ -24,10 +24,10 @@ aes-gcm = "0.10"
 rand = "0.8"
 wasmtime = "29"
 wasmtime-wasi = "29"
+reqwest = { version = "0.12", features = ["json"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
 tokio-stream = "0.1"
 tempfile = "3"
-reqwest = { version = "0.12", features = ["json"] }
 tower = { version = "0.5", features = ["util"] }
