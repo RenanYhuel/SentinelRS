@@ -4,5 +4,6 @@ pub mod proto {
 
 pub mod canonicalize;
 pub mod batch_id;
-pub mod seq;
 pub mod metric_json;
+pub mod nats_config;
+pub mod seq;
