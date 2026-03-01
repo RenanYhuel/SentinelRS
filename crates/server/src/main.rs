@@ -60,6 +60,8 @@ async fn main() {
         }
     };
 
+    let db_pool = agent_repo.as_ref().map(|r| r.pool().clone());
+
     let tls_identity = config
         .tls
         .as_ref()
@@ -97,6 +99,7 @@ async fn main() {
         rules: RuleStore::new(),
         jwt_secret: config.jwt_secret,
         metrics: server_metrics,
+        pool: db_pool,
     };
     let rest_app = rest::router(app_state);
     let rest_addr = config.rest_addr;

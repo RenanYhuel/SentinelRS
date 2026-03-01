@@ -120,6 +120,7 @@ mod tests {
             agent_version: "0.1.0".into(),
             registered_at_ms: 1000,
             deprecated_keys: Vec::new(),
+            last_seen: None,
         }
     }
 

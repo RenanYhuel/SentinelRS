@@ -1,5 +1,6 @@
 use axum::routing::{get, post};
 use axum::Router;
+use sqlx::PgPool;
 use std::sync::Arc;
 
 use super::{agents, health, key_rotation, metrics, notifiers, rules};
@@ -12,6 +13,7 @@ pub struct AppState {
     pub rules: RuleStore,
     pub jwt_secret: Vec<u8>,
     pub metrics: Arc<ServerMetrics>,
+    pub pool: Option<PgPool>,
 }
 
 pub fn router(state: AppState) -> Router {

@@ -11,9 +11,13 @@ impl AgentRepo {
         Self { pool }
     }
 
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     pub async fn load_all(&self, store: &AgentStore) -> Result<usize, sqlx::Error> {
         let rows = sqlx::query_as::<_, AgentRow>(
-            "SELECT agent_id, hw_id, secret, key_id, agent_version, registered_at_ms, deprecated_keys FROM agents",
+            "SELECT agent_id, hw_id, secret, key_id, agent_version, registered_at_ms, deprecated_keys, last_seen FROM agents",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -31,6 +35,7 @@ impl AgentRepo {
                 agent_version: row.agent_version,
                 registered_at_ms: row.registered_at_ms,
                 deprecated_keys,
+                last_seen: row.last_seen,
             });
         }
 
@@ -74,4 +79,5 @@ struct AgentRow {
     agent_version: String,
     registered_at_ms: i64,
     deprecated_keys: serde_json::Value,
+    last_seen: Option<chrono::DateTime<chrono::Utc>>,
 }

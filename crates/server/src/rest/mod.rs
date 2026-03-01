@@ -1,3 +1,4 @@
+mod agent_queries;
 mod agents;
 mod health;
 mod key_rotation;

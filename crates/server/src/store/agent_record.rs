@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::deprecated_key::DeprecatedKey;
@@ -12,4 +13,5 @@ pub struct AgentRecord {
     pub registered_at_ms: i64,
     #[serde(default)]
     pub deprecated_keys: Vec<DeprecatedKey>,
+    pub last_seen: Option<DateTime<Utc>>,
 }
