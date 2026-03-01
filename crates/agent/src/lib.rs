@@ -4,5 +4,6 @@ pub mod buffer;
 pub mod collector;
 pub mod config;
 pub mod exporter;
+pub mod plugin;
 pub mod scheduler;
 pub mod security;
