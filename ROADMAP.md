@@ -22,15 +22,15 @@ Index (sections)
 - [x]   6. Exporter gRPC & Prometheus
 - [x]   7. Server (API gateway / ingestion)
 - [x]   8. Broker integration (NATS JetStream)
-- [ ]   9. Workers (consommation / transformation / stockage)
-- [ ]   10. TimescaleDB schema & storage
-- [ ]   11. Alert engine & notifiers
+- [x]   9. Workers (consommation / transformation / stockage)
+- [x]   10. TimescaleDB schema & storage
+- [x]   11. Alert engine & notifiers
 - [x]   12. Admin CLI
-- [ ]   13. Tests & E2E
-- [ ]   14. CI / Releases / Packaging
-- [ ]   15. Sécurité et provisioning
+- [x]   13. Tests & E2E
+- [x]   14. CI / Releases / Packaging
+- [x]   15. Sécurité et provisioning
 - [x]   16. Observabilité & monitoring interne
-- [ ]   17. Backlog initial (tickets détaillés)
+- [x]   17. Backlog initial (tickets détaillés)
 
 ---
 
@@ -301,28 +301,28 @@ Notes : Use TimescaleDB native functions for downsampling & continuous aggregate
 
 17. Backlog initial (tickets atomiques et priorités logiques)
 
-- [ ] 17.1. `common/proto: finalize sentinel.proto` (includes Metric, Batch, Register, Heartbeat, Config) — depends: none.
+- [x] 17.1. `common/proto: finalize sentinel.proto` (includes Metric, Batch, Register, Heartbeat, Config) — depends: none.
 - [x] 17.2. `common/build.rs: prost codegen` — depends: 17.1. (implémenté)
-- [ ] 17.3. `agent/collector: implement sys metrics (CPU,Mem,Disk,Net)` — depends: 17.1.
-- [ ] 17.4. `agent/wal: append/read/ack API` — depends: 17.3.
-- [ ] 17.5. `agent/batch: composer + signer` — depends: 17.4, 17.2.
-- [ ] 17.6. `server/grpc: PushMetrics handler + validation` — depends: 17.2.
-- [ ] 17.7. `server/nats: publish to JetStream` — depends: 17.6.
-- [ ] 17.8. `workers/consumer: pull from JetStream and transform` — depends: 17.7.
-- [ ] 17.9. `workers/db: insert into timescale` — depends: 17.8, 10.1.
-- [ ] 17.10. `agent/prometheus: /metrics` — depends: 17.3.
-- [ ] 17.11. `plugins/wasm: runtime and sample plugin` — depends: 17.3, 17.2.
-- [ ] 17.12. `ci: github actions skeleton` — depends: repository structure 1.x.
+- [x] 17.3. `agent/collector: implement sys metrics (CPU,Mem,Disk,Net)` — depends: 17.1.
+- [x] 17.4. `agent/wal: append/read/ack API` — depends: 17.3.
+- [x] 17.5. `agent/batch: composer + signer` — depends: 17.4, 17.2.
+- [x] 17.6. `server/grpc: PushMetrics handler + validation` — depends: 17.2.
+- [x] 17.7. `server/nats: publish to JetStream` — depends: 17.6.
+- [x] 17.8. `workers/consumer: pull from JetStream and transform` — depends: 17.7.
+- [x] 17.9. `workers/db: insert into timescale` — depends: 17.8, 10.1.
+- [x] 17.10. `agent/prometheus: /metrics` — depends: 17.3.
+- [x] 17.11. `plugins/wasm: runtime and sample plugin` — depends: 17.3, 17.2.
+- [x] 17.12. `ci: github actions skeleton` — depends: repository structure 1.x.
 - [x] 17.13. `e2e: docker-compose for NATS+Postgres` — depends: 1.3. (deploy/docker-compose ajouté)
 
 ---
 
 Livrables finaux attendus
 
-- [ ] Code compilable via `cargo build --workspace`.
-- [ ] Protos générés et utilisés par agent/server/workers.
-- [ ] Agent capable d'envoyer un batch vers server stub, server publie sur NATS, worker consomme et écrit en DB (end-to-end minimal).
-- [ ] Tests automatisés pour les flows critiques et CI pipeline green.
+- [x] Code compilable via `cargo build --workspace`.
+- [x] Protos générés et utilisés par agent/server/workers.
+- [x] Agent capable d'envoyer un batch vers server stub, server publie sur NATS, worker consomme et écrit en DB (end-to-end minimal).
+- [x] Tests automatisés pour les flows critiques et CI pipeline green.
 
 ---
 
