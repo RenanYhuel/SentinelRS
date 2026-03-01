@@ -1,49 +1,77 @@
 ````md
 # SentinelRS
 
-SentinelRS is a lightweight, modular distributed monitoring system written in Rust.
+Lightweight distributed monitoring system written in Rust.
 
-## Goal
+Collect, sign and stream metrics from edge agents to a central ingestion service.
+Built for reliability (append-only WAL), safe extensibility (WASM plugins) and scalable ingestion (NATS JetStream).
 
-Collect, sign and stream metrics from edge agents to a central ingestion service, with a focus on reliability (append-only WAL), safe extensibility (WASM plugins), and scalable ingestion (NATS JetStream + workers).
+## Architecture
 
-## Repository layout
+```
+Agent (Rust)                    Server (Rust)               Workers (Rust)
+┌──────────────┐   gRPC/TLS    ┌──────────────┐   NATS     ┌──────────────┐
+│ Collectors   │──────────────▶│ Validation   │──────────▶│ Consumer     │
+│ WASM Plugins │               │ Auth (HMAC)  │           │ Transform    │
+│ WAL buffer   │               │ REST API     │           │ Alert Engine │
+│ Batch+Sign   │               │ Rate Limit   │           │ Notifiers    │
+└──────────────┘               └──────────────┘           └──────┬───────┘
+                                                                 │
+                                                          TimescaleDB
+```
 
-- `crates/common` — shared types, protobufs and helpers
-- `crates/agent` — agent binary (collector, WAL, exporter)
-- `crates/server` — ingestion API (gRPC/REST), validation, NATS publisher
-- `crates/workers` — consumers, transformers and DB writers
-- `crates/cli` — admin CLI for operational tasks
+## Crates
 
-## Quickstart (developer)
+| Crate            | Description                                                    |
+| ---------------- | -------------------------------------------------------------- |
+| `crates/common`  | Shared protobuf types, crypto helpers, NATS config             |
+| `crates/agent`   | Agent binary — collectors, WAL, scheduler, gRPC exporter       |
+| `crates/server`  | Ingestion gateway — gRPC/REST, HMAC validation, NATS publisher |
+| `crates/workers` | JetStream consumers, DB writers, alert engine, notifiers       |
+| `crates/cli`     | Admin CLI — register, rotate keys, inspect WAL                 |
 
-1. Install Rust toolchain (stable) and `cargo`.
-2. Build the workspace:
+## Prerequisites
+
+- **Rust** stable toolchain
+- **protoc** (Protocol Buffers compiler)
+- **NATS** with JetStream enabled
+- **PostgreSQL** with TimescaleDB extension
+
+## Getting Started
 
 ```bash
+# Build
 cargo build --workspace --release
-```
-````
 
-3. Run unit tests:
+# Test
+cargo test --workspace
+
+# Format & lint
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+### Local development stack
 
 ```bash
-cargo test --workspace
+docker compose -f deploy/docker-compose.yml up -d
 ```
 
-## Notes
+Starts NATS and TimescaleDB locally. See `config.example.yml` for agent configuration.
 
-- Design documents (`CAHIER_DES_CHARGES.md`, `ROADMAP.md`) are intentionally kept out of the repository and ignored by Git for privacy — they remain in your local workspace.
-- CI skeleton is provided in `.github/workflows/ci.yml`.
+### Generate dev TLS certificates
 
-## Contributing
+```bash
+./scripts/gen-dev-certs.sh
+```
 
-Please open issues or PRs against `main`. For major changes, draft a design note in a local document and discuss on an issue first.
+## CI
+
+GitHub Actions pipeline: **format** → **clippy** → **tests** → **build** (Linux, Windows, macOS) → **integration smoke**.
+
+See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## License
 
-MIT (see `LICENSE` if added)
-
-```
-
-```
+MIT
+````
