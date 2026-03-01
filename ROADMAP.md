@@ -25,7 +25,7 @@ Index (sections)
 - [ ]   9. Workers (consommation / transformation / stockage)
 - [ ]   10. TimescaleDB schema & storage
 - [ ]   11. Alert engine & notifiers
-- [ ]   12. Admin CLI
+- [x]   12. Admin CLI
 - [ ]   13. Tests & E2E
 - [ ]   14. CI / Releases / Packaging
 - [ ]   15. Sécurité et provisioning
@@ -257,9 +257,9 @@ Notes : Use TimescaleDB native functions for downsampling & continuous aggregate
 
 12. Admin CLI (`crates/cli`)
 
-- [ ] 12.1. Subcommands to register agent (call server Register), show config, rotate key, inspect WAL (list unacked batches), force send, tail logs (if local file).
-- [ ] 12.2. Implement JSON output flag for programmatic use.
-- [ ] Tests : integration call to local server stub.
+- [x] 12.1. Subcommands to register agent (call server Register), show config, rotate key, inspect WAL (list unacked batches), force send, tail logs (if local file).
+- [x] 12.2. Implement JSON output flag for programmatic use.
+- [x] Tests : integration call to local server stub.
 
 ---
 
