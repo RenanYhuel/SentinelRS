@@ -30,9 +30,8 @@ jobs:
             - uses: dtolnay/rust-toolchain@stable
               with:
                   components: clippy
-            - uses: arduino/setup-protoc@v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Install protoc
+              run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
             - uses: actions/cache@v4
               with:
                   path: |
@@ -50,9 +49,8 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@stable
-            - uses: arduino/setup-protoc@v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Install protoc
+              run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
             - uses: actions/cache@v4
               with:
                   path: |
@@ -84,9 +82,16 @@ jobs:
             - uses: dtolnay/rust-toolchain@stable
               with:
                   targets: ${{ matrix.target }}
-            - uses: arduino/setup-protoc@v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Install protoc
+              shell: bash
+              run: |
+                  if [ "$RUNNER_OS" = "Linux" ]; then
+                    sudo apt-get update && sudo apt-get install -y protobuf-compiler
+                  elif [ "$RUNNER_OS" = "macOS" ]; then
+                    brew install protobuf
+                  elif [ "$RUNNER_OS" = "Windows" ]; then
+                    choco install protoc -y
+                  fi
             - uses: actions/cache@v4
               with:
                   path: |
@@ -135,9 +140,8 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@stable
-            - uses: arduino/setup-protoc@v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Install protoc
+              run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
             - uses: actions/cache@v4
               with:
                   path: |
