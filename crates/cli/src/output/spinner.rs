@@ -1,6 +1,6 @@
-use std::time::Duration;
-use indicatif::{ProgressBar, ProgressStyle};
 use colored::Colorize;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::time::Duration;
 
 pub fn create(msg: &str) -> ProgressBar {
     let sp = ProgressBar::new_spinner();

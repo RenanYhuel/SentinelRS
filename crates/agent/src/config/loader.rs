@@ -1,5 +1,5 @@
-use std::path::Path;
 use super::schema::AgentConfig;
+use std::path::Path;
 
 #[derive(Debug)]
 pub enum LoadError {
@@ -53,7 +53,9 @@ fn validate(cfg: &AgentConfig) -> Result<(), LoadError> {
         ));
     }
     if cfg.buffer.wal_dir.is_empty() {
-        return Err(LoadError::Validation("buffer.wal_dir must not be empty".into()));
+        return Err(LoadError::Validation(
+            "buffer.wal_dir must not be empty".into(),
+        ));
     }
     Ok(())
 }

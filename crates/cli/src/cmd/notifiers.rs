@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use crate::output::{OutputMode, print_json, spinner, theme, select};
+use crate::output::{print_json, select, spinner, theme, OutputMode};
 
 const NOTIFIER_TYPES: &[&str] = &["webhook", "slack", "discord", "smtp"];
 
@@ -22,21 +22,13 @@ pub struct TestArgs {
     secret: Option<String>,
 }
 
-pub async fn execute(
-    cmd: NotifiersCmd,
-    mode: OutputMode,
-    server: Option<String>,
-) -> Result<()> {
+pub async fn execute(cmd: NotifiersCmd, mode: OutputMode, server: Option<String>) -> Result<()> {
     match cmd {
         NotifiersCmd::Test(args) => test(args, mode, server).await,
     }
 }
 
-async fn test(
-    args: TestArgs,
-    mode: OutputMode,
-    server: Option<String>,
-) -> Result<()> {
+async fn test(args: TestArgs, mode: OutputMode, server: Option<String>) -> Result<()> {
     let notifier_type = match args.r#type {
         Some(t) => t,
         None if mode == OutputMode::Human => {
@@ -50,11 +42,10 @@ async fn test(
     let target = match args.target {
         Some(t) => t,
         None => {
-            let input = dialoguer::Input::<String>::with_theme(
-                &dialoguer::theme::ColorfulTheme::default(),
-            )
-            .with_prompt("Target URL or address")
-            .interact_text()?;
+            let input =
+                dialoguer::Input::<String>::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                    .with_prompt("Target URL or address")
+                    .interact_text()?;
             input
         }
     };
@@ -72,7 +63,9 @@ async fn test(
     }
 
     let sp = match mode {
-        OutputMode::Human => Some(spinner::create(&format!("Testing {notifier_type} notifier..."))),
+        OutputMode::Human => Some(spinner::create(&format!(
+            "Testing {notifier_type} notifier..."
+        ))),
         OutputMode::Json => None,
     };
 
@@ -90,7 +83,10 @@ async fn test(
         }
     } else {
         if let Some(sp) = sp {
-            spinner::finish_err(&sp, &format!("Notifier test failed (HTTP {})", status.as_u16()));
+            spinner::finish_err(
+                &sp,
+                &format!("Notifier test failed (HTTP {})", status.as_u16()),
+            );
         }
         match mode {
             OutputMode::Json => print_json(&serde_json::json!({

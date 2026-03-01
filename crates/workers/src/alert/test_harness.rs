@@ -1,6 +1,6 @@
 use crate::aggregator::AggregatorStore;
-use crate::alert::event::{AlertEvent, AlertStatus};
 use crate::alert::evaluator::Evaluator;
+use crate::alert::event::{AlertEvent, AlertStatus};
 use crate::alert::rule::Rule;
 
 pub struct MetricSample {
@@ -78,8 +78,18 @@ mod tests {
     #[test]
     fn single_breach_fires_once() {
         let samples = vec![
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 1000, value: 90.0 },
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 2000, value: 95.0 },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 1000,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 2000,
+                value: 95.0,
+            },
         ];
         let result = run_harness(vec![high_cpu_rule()], samples);
         assert_eq!(result.firing_count, 1);
@@ -89,8 +99,18 @@ mod tests {
     #[test]
     fn breach_then_recovery() {
         let samples = vec![
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 1000, value: 90.0 },
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 2000, value: 50.0 },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 1000,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 2000,
+                value: 50.0,
+            },
         ];
         let result = run_harness(vec![high_cpu_rule()], samples);
         assert_eq!(result.firing_count, 1);
@@ -100,8 +120,18 @@ mod tests {
     #[test]
     fn no_breach_no_events() {
         let samples = vec![
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 1000, value: 50.0 },
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 2000, value: 60.0 },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 1000,
+                value: 50.0,
+            },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 2000,
+                value: 60.0,
+            },
         ];
         let result = run_harness(vec![high_cpu_rule()], samples);
         assert_eq!(result.firing_count, 0);
@@ -114,15 +144,35 @@ mod tests {
         rule.for_duration_ms = 5000;
 
         let samples = vec![
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 1000, value: 90.0 },
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 3000, value: 90.0 },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 1000,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 3000,
+                value: 90.0,
+            },
         ];
         let result = run_harness(vec![rule.clone()], samples);
         assert_eq!(result.firing_count, 0);
 
         let samples_long = vec![
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 1000, value: 90.0 },
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 7000, value: 90.0 },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 1000,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 7000,
+                value: 90.0,
+            },
         ];
         let result2 = run_harness(vec![rule], samples_long);
         assert_eq!(result2.firing_count, 1);
@@ -131,8 +181,18 @@ mod tests {
     #[test]
     fn multi_agent_independent() {
         let samples = vec![
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 1000, value: 90.0 },
-            MetricSample { agent_id: "a2".into(), metric_name: "cpu".into(), timestamp_ms: 1000, value: 90.0 },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 1000,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a2".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 1000,
+                value: 90.0,
+            },
         ];
         let result = run_harness(vec![high_cpu_rule()], samples);
         assert_eq!(result.firing_count, 2);
@@ -153,8 +213,18 @@ mod tests {
         };
 
         let samples = vec![
-            MetricSample { agent_id: "a1".into(), metric_name: "cpu".into(), timestamp_ms: 1000, value: 90.0 },
-            MetricSample { agent_id: "a1".into(), metric_name: "memory".into(), timestamp_ms: 1000, value: 95.0 },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 1000,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "memory".into(),
+                timestamp_ms: 1000,
+                value: 95.0,
+            },
         ];
         let result = run_harness(vec![high_cpu_rule(), mem_rule], samples);
         assert_eq!(result.firing_count, 2);

@@ -1,9 +1,9 @@
 use tonic::{Request, Response, Status};
 
+use crate::store::AgentStore;
 use sentinel_common::proto::push_response::Status as PushStatus;
 use sentinel_common::proto::{Heartbeat, PushResponse};
 use sentinel_common::trace_id::generate_trace_id;
-use crate::store::AgentStore;
 
 pub async fn handle_heartbeat(
     agents: &AgentStore,

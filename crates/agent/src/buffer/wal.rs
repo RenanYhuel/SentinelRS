@@ -46,7 +46,10 @@ impl Wal {
                 }
             }
             let name = entry.file_name().to_string_lossy().to_string();
-            if let Some(idx_str) = name.strip_prefix("wal-").and_then(|s| s.strip_suffix(".log")) {
+            if let Some(idx_str) = name
+                .strip_prefix("wal-")
+                .and_then(|s| s.strip_suffix(".log"))
+            {
                 if let Ok(idx) = idx_str.parse::<u64>() {
                     if idx >= segment_index {
                         segment_index = idx + 1;

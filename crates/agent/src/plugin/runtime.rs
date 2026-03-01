@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use wasmtime::{Engine, Linker, Module, Store};
 use super::engine::{create_engine, create_store_limits};
 use super::error::PluginError;
 use super::host_fns::register_host_fns;
 use super::host_state::HostState;
 use super::manifest::PluginManifest;
+use std::sync::Arc;
+use wasmtime::{Engine, Linker, Module, Store};
 
 pub struct PluginRuntime {
     engine: Arc<Engine>,
@@ -66,7 +66,9 @@ impl PluginRuntime {
                     logs: st.logs,
                 })
             }
-            Ok(code) => Err(PluginError::Execution(format!("plugin returned code {code}"))),
+            Ok(code) => Err(PluginError::Execution(format!(
+                "plugin returned code {code}"
+            ))),
             Err(e) => {
                 let msg = e.to_string();
                 if msg.contains("epoch") {

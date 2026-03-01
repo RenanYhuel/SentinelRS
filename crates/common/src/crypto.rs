@@ -1,5 +1,5 @@
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
@@ -39,7 +39,11 @@ mod tests {
     #[test]
     fn wrong_signature_rejected() {
         assert!(!verify_signature(b"secret", b"data", "bad-base64!"));
-        assert!(!verify_signature(b"secret", b"data", &STANDARD.encode(b"wrong")));
+        assert!(!verify_signature(
+            b"secret",
+            b"data",
+            &STANDARD.encode(b"wrong")
+        ));
     }
 
     #[test]

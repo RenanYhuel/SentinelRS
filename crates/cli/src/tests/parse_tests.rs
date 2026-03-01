@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use clap::Parser;
     use crate::Opts;
+    use clap::Parser;
 
     fn parse(args: &[&str]) -> Opts {
         let mut full = vec!["sentinel"];
@@ -97,7 +97,14 @@ mod tests {
 
     #[test]
     fn parse_notifiers_test() {
-        let opts = parse(&["notifiers", "test", "--type", "webhook", "--target", "http://example.com"]);
+        let opts = parse(&[
+            "notifiers",
+            "test",
+            "--type",
+            "webhook",
+            "--target",
+            "http://example.com",
+        ]);
         assert!(matches!(opts.cmd, crate::cmd::Commands::Notifiers(_)));
     }
 

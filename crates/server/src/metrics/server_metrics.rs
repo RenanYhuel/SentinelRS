@@ -55,7 +55,8 @@ impl ServerMetrics {
     }
 
     pub fn inc_broker_publish_errors(&self) {
-        self.broker_publish_errors_total.fetch_add(1, Ordering::Relaxed);
+        self.broker_publish_errors_total
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn record_grpc_latency(&self, start: Instant) {

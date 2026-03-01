@@ -27,17 +27,18 @@ pub fn decode_batch(msg: &Message) -> Result<Batch, HandleError> {
 }
 
 pub fn extract_header(msg: &Message, key: &str) -> Option<String> {
-    msg.headers
-        .as_ref()?
-        .get(key)
-        .map(|v| v.to_string())
+    msg.headers.as_ref()?.get(key).map(|v| v.to_string())
 }
 
 pub async fn pull_batch(
     consumer: &PullConsumer,
     max_messages: usize,
 ) -> Result<Vec<Message>, BoxError> {
-    let mut messages = consumer.fetch().max_messages(max_messages).messages().await?;
+    let mut messages = consumer
+        .fetch()
+        .max_messages(max_messages)
+        .messages()
+        .await?;
     let mut batch = Vec::with_capacity(max_messages);
     while let Some(Ok(msg)) = messages.next().await {
         batch.push(msg);

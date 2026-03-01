@@ -9,5 +9,8 @@ fn main() {
         .compile_protos(&[proto_path], &[proto_dir])
         .expect("Failed to compile proto files with tonic-build");
 
-    println!("cargo:rerun-if-changed={}/proto/sentinel.proto", std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    println!(
+        "cargo:rerun-if-changed={}/proto/sentinel.proto",
+        std::env::var("CARGO_MANIFEST_DIR").unwrap()
+    );
 }

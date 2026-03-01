@@ -1,7 +1,7 @@
-use std::io::{Read, Write};
-use flate2::Compression;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
+use flate2::Compression;
+use std::io::{Read, Write};
 
 const COMPRESS_THRESHOLD: usize = 1024;
 

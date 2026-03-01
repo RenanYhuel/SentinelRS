@@ -1,8 +1,8 @@
 use reqwest::Client;
 
-use crate::alert::AlertEvent;
 use super::channel::{Notifier, NotifyError};
 use super::signer::sign_payload;
+use crate::alert::AlertEvent;
 
 pub struct WebhookNotifier {
     url: String,

@@ -1,4 +1,4 @@
-use crate::output::{OutputMode, print_json, banner};
+use crate::output::{banner, print_json, OutputMode};
 use serde::Serialize;
 
 #[derive(Serialize)]

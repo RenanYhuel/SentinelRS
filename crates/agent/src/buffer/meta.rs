@@ -44,8 +44,8 @@ impl WalMeta {
 
     pub fn save(&self, dir: &Path) -> io::Result<()> {
         let path = dir.join(META_FILE);
-        let json =
-            serde_json::to_string_pretty(self).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         let mut f = fs::File::create(&path)?;
         f.write_all(json.as_bytes())?;
         f.sync_all()?;

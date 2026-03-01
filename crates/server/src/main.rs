@@ -13,8 +13,7 @@ use tonic::transport::Server as TonicServer;
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .json()
         .init();
@@ -25,16 +24,18 @@ async fn main() {
     let broker = InMemoryBroker::new();
     let server_metrics = ServerMetrics::new();
 
-    let tls_identity = config.tls.as_ref().map(|tls_cfg| {
-        TlsIdentity::load(tls_cfg).expect("failed to load TLS certificates")
-    });
+    let tls_identity = config
+        .tls
+        .as_ref()
+        .map(|tls_cfg| TlsIdentity::load(tls_cfg).expect("failed to load TLS certificates"));
 
     let grpc_service = AgentServiceImpl::new(agents.clone(), idempotency, broker);
     let grpc_addr = config.grpc_addr;
 
-    let grpc_tls = tls_identity
-        .as_ref()
-        .map(|id| id.tonic_server_tls().expect("failed to build gRPC TLS config"));
+    let grpc_tls = tls_identity.as_ref().map(|id| {
+        id.tonic_server_tls()
+            .expect("failed to build gRPC TLS config")
+    });
 
     let grpc_handle = tokio::spawn(async move {
         tracing::info!(%grpc_addr, "gRPC server starting");

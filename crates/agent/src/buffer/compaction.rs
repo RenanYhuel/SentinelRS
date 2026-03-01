@@ -32,7 +32,10 @@ pub fn compact(dir: &Path, meta: &WalMeta) -> io::Result<WalMeta> {
     }
     fs::remove_dir_all(&tmp_dir)?;
 
-    let head_seq = unacked_records.first().map(|r| r.id).unwrap_or(meta.tail_seq);
+    let head_seq = unacked_records
+        .first()
+        .map(|r| r.id)
+        .unwrap_or(meta.tail_seq);
     let new_meta = WalMeta {
         head_seq,
         tail_seq: meta.tail_seq,
@@ -98,8 +101,8 @@ fn total_log_size(dir: &Path) -> io::Result<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::wal::Wal;
+    use super::*;
 
     #[test]
     fn compact_removes_acked_records() {

@@ -1,6 +1,6 @@
-use axum::http::StatusCode;
-use axum::extract::State;
 use super::state::AgentState;
+use axum::extract::State;
+use axum::http::StatusCode;
 
 pub async fn healthz() -> StatusCode {
     StatusCode::OK
@@ -26,7 +26,10 @@ mod tests {
     #[tokio::test]
     async fn ready_reflects_state() {
         let state = AgentState::new();
-        assert_eq!(ready(State(state.clone())).await, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            ready(State(state.clone())).await,
+            StatusCode::SERVICE_UNAVAILABLE
+        );
 
         state.set_ready(true);
         assert_eq!(ready(State(state)).await, StatusCode::OK);

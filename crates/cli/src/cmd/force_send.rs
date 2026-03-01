@@ -2,12 +2,12 @@ use anyhow::{Context, Result};
 use clap::Args;
 use std::path::PathBuf;
 
+use super::helpers;
+use crate::output::{confirm, print_json, progress, spinner, theme, OutputMode};
 use sentinel_agent::batch::BatchComposer;
 use sentinel_agent::buffer::Wal;
 use sentinel_agent::exporter::GrpcClient;
 use sentinel_common::proto::push_response::Status;
-use crate::output::{OutputMode, print_json, spinner, progress, theme, confirm};
-use super::helpers;
 
 #[derive(Args)]
 pub struct ForceSendArgs {
@@ -54,11 +54,8 @@ pub async fn execute(
 
     let creds = load_credentials()?;
 
-    let secret = base64::Engine::decode(
-        &base64::engine::general_purpose::STANDARD,
-        &creds.secret,
-    )
-    .context("invalid base64 secret")?;
+    let secret = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &creds.secret)
+        .context("invalid base64 secret")?;
 
     let sp = match mode {
         OutputMode::Human => Some(spinner::create("Connecting to server...")),

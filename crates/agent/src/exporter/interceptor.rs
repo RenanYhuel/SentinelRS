@@ -1,5 +1,5 @@
-use tonic::service::Interceptor;
 use tonic::metadata::MetadataValue;
+use tonic::service::Interceptor;
 use tonic::{Request, Status};
 
 #[derive(Clone)]
@@ -19,11 +19,13 @@ impl Interceptor for AuthInterceptor {
         let meta = request.metadata_mut();
         meta.insert(
             "x-agent-id",
-            MetadataValue::try_from(&self.agent_id).map_err(|_| Status::internal("invalid agent id"))?,
+            MetadataValue::try_from(&self.agent_id)
+                .map_err(|_| Status::internal("invalid agent id"))?,
         );
         meta.insert(
             "x-key-id",
-            MetadataValue::try_from(&self.key_id).map_err(|_| Status::internal("invalid key id"))?,
+            MetadataValue::try_from(&self.key_id)
+                .map_err(|_| Status::internal("invalid key id"))?,
         );
         Ok(request)
     }

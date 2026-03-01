@@ -1,10 +1,10 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
+use sentinel_common::proto::agent_service_client::AgentServiceClient;
 use sentinel_common::proto::agent_service_server::AgentServiceServer;
 use sentinel_common::proto::metric::Value;
 use sentinel_common::proto::{Batch, Metric, RegisterRequest};
-use sentinel_common::proto::agent_service_client::AgentServiceClient;
 use tonic::transport::{Channel, Server};
 use tonic::Request;
 

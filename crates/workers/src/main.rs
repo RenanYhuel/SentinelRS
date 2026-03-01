@@ -1,14 +1,18 @@
 use sentinel_common::nats_config::StreamConfig;
 use sentinel_common::trace_id::generate_trace_id;
 use sentinel_workers::api;
-use sentinel_workers::consumer::{ConsumerLoop, connect_jetstream, create_pull_consumer, ensure_stream};
+use sentinel_workers::consumer::{
+    connect_jetstream, create_pull_consumer, ensure_stream, ConsumerLoop,
+};
 use sentinel_workers::metrics::worker_metrics::WorkerMetrics;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .json()
         .init();
 

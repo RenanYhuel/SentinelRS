@@ -1,4 +1,4 @@
-use comfy_table::{Table, ContentArrangement, Cell, Color, Attribute, presets::UTF8_FULL};
+use comfy_table::{presets::UTF8_FULL, Attribute, Cell, Color, ContentArrangement, Table};
 
 pub fn build_table(headers: &[&str]) -> Table {
     let mut table = Table::new();
@@ -6,11 +6,7 @@ pub fn build_table(headers: &[&str]) -> Table {
     table.set_content_arrangement(ContentArrangement::Dynamic);
     let cells: Vec<Cell> = headers
         .iter()
-        .map(|h| {
-            Cell::new(h)
-                .fg(Color::Cyan)
-                .add_attribute(Attribute::Bold)
-        })
+        .map(|h| Cell::new(h).fg(Color::Cyan).add_attribute(Attribute::Bold))
         .collect();
     table.set_header(cells);
     table

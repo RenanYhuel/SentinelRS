@@ -18,7 +18,9 @@ mod tests {
     fn load_config_from_tempfile() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent.yml");
-        std::fs::write(&path, r#"
+        std::fs::write(
+            &path,
+            r#"
 server: http://localhost:50051
 collect:
   interval_seconds: 10
@@ -26,7 +28,9 @@ collect:
 buffer:
   wal_dir: /tmp/wal
 security: {}
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let cfg = helpers::load_config(Some(path.to_str().unwrap()));
         assert!(cfg.is_ok());
@@ -45,7 +49,9 @@ security: {}
     fn resolve_server_falls_back_to_config() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent.yml");
-        std::fs::write(&path, r#"
+        std::fs::write(
+            &path,
+            r#"
 server: http://fromconfig:50051
 collect:
   interval_seconds: 5
@@ -53,7 +59,9 @@ collect:
 buffer:
   wal_dir: /tmp/wal
 security: {}
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let result = helpers::resolve_server(None, Some(path.to_str().unwrap()));
         assert!(result.is_ok());

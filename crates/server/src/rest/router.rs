@@ -1,10 +1,10 @@
-use axum::Router;
 use axum::routing::{get, post};
+use axum::Router;
 use std::sync::Arc;
 
+use super::{agents, health, key_rotation, metrics, notifiers, rules};
 use crate::metrics::server_metrics::ServerMetrics;
 use crate::store::{AgentStore, RuleStore};
-use super::{agents, health, key_rotation, metrics, notifiers, rules};
 
 #[derive(Clone)]
 pub struct AppState {

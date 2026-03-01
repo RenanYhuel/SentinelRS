@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use crate::output::{OutputMode, print_json, print_success, build_table, spinner, theme, confirm};
 use super::helpers;
+use crate::output::{build_table, confirm, print_json, print_success, spinner, theme, OutputMode};
 
 #[derive(Subcommand)]
 pub enum RulesCmd {
@@ -216,11 +216,7 @@ async fn delete(base: &str, args: DeleteArgs, mode: OutputMode) -> Result<()> {
     };
 
     let client = reqwest::Client::new();
-    client
-        .delete(&url)
-        .send()
-        .await?
-        .error_for_status()?;
+    client.delete(&url).send().await?.error_for_status()?;
 
     if let Some(sp) = sp {
         spinner::finish_ok(&sp, &format!("Rule '{}' deleted", args.id));

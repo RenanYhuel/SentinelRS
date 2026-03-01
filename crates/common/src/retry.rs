@@ -37,8 +37,7 @@ where
                 last_err = Some(e);
                 if attempt < config.max_attempts {
                     tokio::time::sleep(delay).await;
-                    delay =
-                        Duration::from_secs_f64(delay.as_secs_f64() * config.backoff_factor);
+                    delay = Duration::from_secs_f64(delay.as_secs_f64() * config.backoff_factor);
                 }
             }
         }
@@ -66,8 +65,7 @@ where
                 last_err = Some(e);
                 if attempt < config.max_attempts {
                     std::thread::sleep(delay);
-                    delay =
-                        Duration::from_secs_f64(delay.as_secs_f64() * config.backoff_factor);
+                    delay = Duration::from_secs_f64(delay.as_secs_f64() * config.backoff_factor);
                 }
             }
         }
@@ -120,8 +118,7 @@ mod tests {
             backoff_factor: 1.0,
         };
 
-        let result: Result<(), &str> =
-            retry_async(&config, || async { Err("always fails") }).await;
+        let result: Result<(), &str> = retry_async(&config, || async { Err("always fails") }).await;
 
         assert!(result.is_err());
     }

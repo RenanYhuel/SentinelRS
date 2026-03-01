@@ -23,8 +23,8 @@ impl EncryptedFileKeyStore {
     }
 
     fn encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>, KeyStoreError> {
-        let cipher =
-            Aes256Gcm::new_from_slice(&self.master_key).map_err(|e| KeyStoreError::Crypto(e.to_string()))?;
+        let cipher = Aes256Gcm::new_from_slice(&self.master_key)
+            .map_err(|e| KeyStoreError::Crypto(e.to_string()))?;
         let mut nonce_bytes = [0u8; 12];
         OsRng.fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
@@ -41,8 +41,8 @@ impl EncryptedFileKeyStore {
             return Err(KeyStoreError::Crypto("data too short".into()));
         }
         let (nonce_bytes, ciphertext) = data.split_at(12);
-        let cipher =
-            Aes256Gcm::new_from_slice(&self.master_key).map_err(|e| KeyStoreError::Crypto(e.to_string()))?;
+        let cipher = Aes256Gcm::new_from_slice(&self.master_key)
+            .map_err(|e| KeyStoreError::Crypto(e.to_string()))?;
         let nonce = Nonce::from_slice(nonce_bytes);
         cipher
             .decrypt(nonce, ciphertext)

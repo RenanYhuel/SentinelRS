@@ -69,13 +69,21 @@ mod tests {
         let mut seg = Segment::create(dir.path(), 1).unwrap();
 
         seg.append(
-            &Record { id: 0, data: b"first".to_vec() },
+            &Record {
+                id: 0,
+                data: b"first".to_vec(),
+            },
             true,
-        ).unwrap();
+        )
+        .unwrap();
         seg.append(
-            &Record { id: 1, data: b"second".to_vec() },
+            &Record {
+                id: 1,
+                data: b"second".to_vec(),
+            },
             true,
-        ).unwrap();
+        )
+        .unwrap();
 
         let records = Segment::read_all(seg.path()).unwrap();
         assert_eq!(records.len(), 2);

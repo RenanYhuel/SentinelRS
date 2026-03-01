@@ -1,8 +1,8 @@
-use sentinel_common::proto::push_response::Status;
 use super::client::GrpcClient;
 use super::retry::RetryPolicy;
-use crate::buffer::Wal;
 use crate::batch::BatchComposer;
+use crate::buffer::Wal;
+use sentinel_common::proto::push_response::Status;
 
 pub struct SendLoop {
     pub retry_policy: RetryPolicy,

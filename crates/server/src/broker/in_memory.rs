@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use sentinel_common::proto::Batch;
 use super::publisher::{BrokerError, BrokerPublisher};
+use sentinel_common::proto::Batch;
 
 #[derive(Clone)]
 pub struct InMemoryBroker {

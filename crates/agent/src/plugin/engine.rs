@@ -1,6 +1,6 @@
-use wasmtime::{Engine, Config, StoreLimitsBuilder, StoreLimits};
 use super::error::PluginError;
 use super::manifest::ResourceLimits;
+use wasmtime::{Config, Engine, StoreLimits, StoreLimitsBuilder};
 
 pub fn create_engine() -> Result<Engine, PluginError> {
     let mut config = Config::new();

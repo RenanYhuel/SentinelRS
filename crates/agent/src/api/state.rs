@@ -77,9 +77,7 @@ impl AgentState {
     }
 
     pub fn is_ready(&self) -> bool {
-        self.inner
-            .ready
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.inner.ready.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 

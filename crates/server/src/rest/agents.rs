@@ -13,9 +13,7 @@ pub struct AgentSummary {
     pub registered_at_ms: i64,
 }
 
-pub async fn list_agents(
-    State(state): State<AppState>,
-) -> Json<Vec<AgentSummary>> {
+pub async fn list_agents(State(state): State<AppState>) -> Json<Vec<AgentSummary>> {
     let agents = state
         .agents
         .list()

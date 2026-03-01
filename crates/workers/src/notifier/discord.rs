@@ -1,7 +1,7 @@
 use reqwest::Client;
 
-use crate::alert::AlertEvent;
 use super::channel::{Notifier, NotifyError};
+use crate::alert::AlertEvent;
 
 pub struct DiscordNotifier {
     webhook_url: String,

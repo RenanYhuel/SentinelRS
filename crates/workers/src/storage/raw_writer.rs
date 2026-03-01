@@ -15,14 +15,12 @@ impl RawWriter {
         batch_id: &str,
         payload: &serde_json::Value,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "INSERT INTO metrics_raw (agent_id, batch_id, payload) VALUES ($1, $2, $3)",
-        )
-        .bind(agent_id)
-        .bind(batch_id)
-        .bind(payload)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("INSERT INTO metrics_raw (agent_id, batch_id, payload) VALUES ($1, $2, $3)")
+            .bind(agent_id)
+            .bind(batch_id)
+            .bind(payload)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 }

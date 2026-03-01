@@ -1,11 +1,11 @@
 use tonic::{Request, Response, Status};
 
-use sentinel_common::proto::push_response::Status as PushStatus;
-use sentinel_common::proto::{Batch, PushResponse};
-use sentinel_common::trace_id::generate_trace_id;
 use crate::auth::verify_signature;
 use crate::broker::BrokerPublisher;
 use crate::store::{AgentStore, IdempotencyStore};
+use sentinel_common::proto::push_response::Status as PushStatus;
+use sentinel_common::proto::{Batch, PushResponse};
+use sentinel_common::trace_id::generate_trace_id;
 
 const DEFAULT_GRACE_PERIOD_MS: i64 = 24 * 60 * 60 * 1000;
 const DEFAULT_REPLAY_WINDOW_MS: i64 = 5 * 60 * 1000;
@@ -55,7 +55,9 @@ pub async fn handle_push_metrics_with_config(
     if replay_window_ms > 0 && batch.created_at_ms > 0 {
         let age = (now_ms - batch.created_at_ms).abs();
         if age > replay_window_ms {
-            return Err(Status::unauthenticated("batch timestamp outside replay window"));
+            return Err(Status::unauthenticated(
+                "batch timestamp outside replay window",
+            ));
         }
     }
 
@@ -123,8 +125,8 @@ mod tests {
     use super::*;
     use crate::broker::InMemoryBroker;
     use crate::store::AgentRecord;
-    use base64::Engine;
     use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
     use tonic::metadata::MetadataValue;
@@ -157,14 +159,10 @@ mod tests {
 
     fn make_request(agent_id: &str, signature: &str, batch: Batch) -> Request<Batch> {
         let mut req = Request::new(batch);
-        req.metadata_mut().insert(
-            "x-agent-id",
-            MetadataValue::try_from(agent_id).unwrap(),
-        );
-        req.metadata_mut().insert(
-            "x-signature",
-            MetadataValue::try_from(signature).unwrap(),
-        );
+        req.metadata_mut()
+            .insert("x-agent-id", MetadataValue::try_from(agent_id).unwrap());
+        req.metadata_mut()
+            .insert("x-signature", MetadataValue::try_from(signature).unwrap());
         req
     }
 

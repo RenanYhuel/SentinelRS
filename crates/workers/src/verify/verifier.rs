@@ -88,7 +88,9 @@ mod tests {
     #[tokio::test]
     async fn no_signature_skips() {
         let batch = test_batch();
-        let provider = StaticProvider { secrets: HashMap::new() };
+        let provider = StaticProvider {
+            secrets: HashMap::new(),
+        };
         match verify_batch(&provider, &batch, None).await {
             VerifyResult::Skipped => {}
             _ => panic!("expected Skipped"),
@@ -98,7 +100,9 @@ mod tests {
     #[tokio::test]
     async fn no_secret_skips() {
         let batch = test_batch();
-        let provider = StaticProvider { secrets: HashMap::new() };
+        let provider = StaticProvider {
+            secrets: HashMap::new(),
+        };
         match verify_batch(&provider, &batch, Some("some-sig")).await {
             VerifyResult::Skipped => {}
             _ => panic!("expected Skipped"),

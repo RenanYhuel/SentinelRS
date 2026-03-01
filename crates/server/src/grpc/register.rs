@@ -1,11 +1,11 @@
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use tonic::{Request, Response, Status};
 
-use sentinel_common::proto::{RegisterRequest, RegisterResponse};
-use sentinel_common::trace_id::generate_trace_id;
 use crate::auth::generate_secret;
 use crate::store::{AgentRecord, AgentStore};
+use sentinel_common::proto::{RegisterRequest, RegisterResponse};
+use sentinel_common::trace_id::generate_trace_id;
 
 pub async fn handle_register(
     store: &AgentStore,

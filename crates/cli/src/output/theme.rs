@@ -17,7 +17,11 @@ pub fn print_section(title: &str) {
 }
 
 pub fn print_kv(label: &str, value: &str) {
-    println!("    {} {}", format!("{:<16}", label).dimmed(), value.bright_white());
+    println!(
+        "    {} {}",
+        format!("{:<16}", label).dimmed(),
+        value.bright_white()
+    );
 }
 
 pub fn print_kv_colored(label: &str, value: &str, ok: bool) {

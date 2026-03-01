@@ -172,10 +172,7 @@ pub async fn update_rule(
     Ok(Json(to_response(updated)))
 }
 
-pub async fn delete_rule(
-    State(state): State<AppState>,
-    Path(rule_id): Path<String>,
-) -> StatusCode {
+pub async fn delete_rule(State(state): State<AppState>, Path(rule_id): Path<String>) -> StatusCode {
     if state.rules.delete(&rule_id) {
         StatusCode::NO_CONTENT
     } else {

@@ -1,7 +1,7 @@
+use super::state::AgentState;
 use axum::extract::State;
 use axum::http::header;
 use axum::response::IntoResponse;
-use super::state::AgentState;
 
 pub async fn metrics(State(state): State<AgentState>) -> impl IntoResponse {
     let body = format!(
@@ -28,7 +28,10 @@ pub async fn metrics(State(state): State<AgentState>) -> impl IntoResponse {
     );
 
     (
-        [(header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")],
+        [(
+            header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
         body,
     )
 }

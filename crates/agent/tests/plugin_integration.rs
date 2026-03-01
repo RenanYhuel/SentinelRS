@@ -1,6 +1,6 @@
 use sentinel_agent::plugin::{
-    sign_blob, store_blob, store_manifest, load_blob, verify_blob,
-    PluginManifest, PluginRuntime, ResourceLimits,
+    load_blob, sign_blob, store_blob, store_manifest, verify_blob, PluginManifest, PluginRuntime,
+    ResourceLimits,
 };
 use tempfile::TempDir;
 
@@ -44,7 +44,12 @@ fn plugin_full_lifecycle_install_and_execute() {
 
     store_blob(dir.path(), "nginx_stub_status", wasm).unwrap();
     let manifest = nginx_stub_manifest();
-    store_manifest(dir.path(), "nginx_stub_status", &manifest.to_yaml().unwrap()).unwrap();
+    store_manifest(
+        dir.path(),
+        "nginx_stub_status",
+        &manifest.to_yaml().unwrap(),
+    )
+    .unwrap();
 
     let loaded = load_blob(dir.path(), "nginx_stub_status").unwrap();
     let rt = PluginRuntime::load(&loaded, manifest).unwrap();

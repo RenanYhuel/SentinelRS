@@ -3,8 +3,8 @@ pub mod worker_metrics;
 
 #[cfg(test)]
 mod tests {
-    use super::worker_metrics::WorkerMetrics;
     use super::exposition::render_prometheus;
+    use super::worker_metrics::WorkerMetrics;
     use std::time::Instant;
 
     #[test]

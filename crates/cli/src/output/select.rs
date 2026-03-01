@@ -1,4 +1,4 @@
-use dialoguer::{theme::ColorfulTheme, Select, FuzzySelect};
+use dialoguer::{theme::ColorfulTheme, FuzzySelect, Select};
 
 pub fn select_option(prompt: &str, items: &[&str]) -> Option<usize> {
     Select::with_theme(&ColorfulTheme::default())

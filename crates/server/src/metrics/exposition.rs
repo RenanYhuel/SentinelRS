@@ -1,18 +1,54 @@
-use std::sync::Arc;
 use super::server_metrics::ServerMetrics;
+use std::sync::Arc;
 
 pub fn render_prometheus(m: &Arc<ServerMetrics>) -> String {
     let mut out = String::with_capacity(1024);
 
-    write_counter(&mut out, "sentinel_server_grpc_requests_total", m.grpc_requests_total());
-    write_counter(&mut out, "sentinel_server_grpc_errors_total", m.grpc_errors_total());
-    write_counter(&mut out, "sentinel_server_rest_requests_total", m.rest_requests_total());
-    write_counter(&mut out, "sentinel_server_registrations_total", m.registrations_total());
-    write_counter(&mut out, "sentinel_server_pushes_accepted_total", m.pushes_accepted_total());
-    write_counter(&mut out, "sentinel_server_pushes_rejected_total", m.pushes_rejected_total());
-    write_counter(&mut out, "sentinel_server_heartbeats_total", m.heartbeats_total());
-    write_counter(&mut out, "sentinel_server_key_rotations_total", m.key_rotations_total());
-    write_counter(&mut out, "sentinel_server_broker_publish_errors_total", m.broker_publish_errors_total());
+    write_counter(
+        &mut out,
+        "sentinel_server_grpc_requests_total",
+        m.grpc_requests_total(),
+    );
+    write_counter(
+        &mut out,
+        "sentinel_server_grpc_errors_total",
+        m.grpc_errors_total(),
+    );
+    write_counter(
+        &mut out,
+        "sentinel_server_rest_requests_total",
+        m.rest_requests_total(),
+    );
+    write_counter(
+        &mut out,
+        "sentinel_server_registrations_total",
+        m.registrations_total(),
+    );
+    write_counter(
+        &mut out,
+        "sentinel_server_pushes_accepted_total",
+        m.pushes_accepted_total(),
+    );
+    write_counter(
+        &mut out,
+        "sentinel_server_pushes_rejected_total",
+        m.pushes_rejected_total(),
+    );
+    write_counter(
+        &mut out,
+        "sentinel_server_heartbeats_total",
+        m.heartbeats_total(),
+    );
+    write_counter(
+        &mut out,
+        "sentinel_server_key_rotations_total",
+        m.key_rotations_total(),
+    );
+    write_counter(
+        &mut out,
+        "sentinel_server_broker_publish_errors_total",
+        m.broker_publish_errors_total(),
+    );
 
     let (sum, count) = m.grpc_latency_vals();
     write_summary(&mut out, "sentinel_server_grpc_latency_us", sum, count);

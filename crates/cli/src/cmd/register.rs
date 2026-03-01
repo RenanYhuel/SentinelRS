@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use clap::Args;
 use tonic::transport::Channel;
 
+use crate::output::{print_info, print_json, spinner, theme, OutputMode};
 use sentinel_common::proto::agent_service_client::AgentServiceClient;
 use sentinel_common::proto::RegisterRequest;
-use crate::output::{OutputMode, print_json, print_info, spinner, theme};
 
 #[derive(Args)]
 pub struct RegisterArgs {
@@ -30,10 +30,7 @@ pub async fn execute(
     server: Option<String>,
     config_path: Option<String>,
 ) -> Result<()> {
-    let endpoint = super::helpers::resolve_server(
-        server.as_deref(),
-        config_path.as_deref(),
-    )?;
+    let endpoint = super::helpers::resolve_server(server.as_deref(), config_path.as_deref())?;
 
     let sp = match mode {
         OutputMode::Human => Some(spinner::create("Connecting to server...")),

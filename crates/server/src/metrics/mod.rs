@@ -3,8 +3,8 @@ pub mod server_metrics;
 
 #[cfg(test)]
 mod tests {
-    use super::server_metrics::ServerMetrics;
     use super::exposition::render_prometheus;
+    use super::server_metrics::ServerMetrics;
 
     #[test]
     fn prometheus_contains_all_counters() {

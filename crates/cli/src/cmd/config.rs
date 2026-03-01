@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use crate::output::{OutputMode, print_json, print_success, print_error, theme};
 use super::helpers;
+use crate::output::{print_error, print_json, print_success, theme, OutputMode};
 
 #[derive(Subcommand)]
 pub enum ConfigCmd {
@@ -39,17 +39,35 @@ fn show(_args: ShowArgs, mode: OutputMode, config_path: Option<String>) -> Resul
 
             theme::print_section("Collection");
             theme::print_kv("Interval", &format!("{}s", cfg.collect.interval_seconds));
-            theme::print_kv_colored("CPU", &cfg.collect.metrics.cpu.to_string(), cfg.collect.metrics.cpu);
-            theme::print_kv_colored("Memory", &cfg.collect.metrics.mem.to_string(), cfg.collect.metrics.mem);
-            theme::print_kv_colored("Disk", &cfg.collect.metrics.disk.to_string(), cfg.collect.metrics.disk);
+            theme::print_kv_colored(
+                "CPU",
+                &cfg.collect.metrics.cpu.to_string(),
+                cfg.collect.metrics.cpu,
+            );
+            theme::print_kv_colored(
+                "Memory",
+                &cfg.collect.metrics.mem.to_string(),
+                cfg.collect.metrics.mem,
+            );
+            theme::print_kv_colored(
+                "Disk",
+                &cfg.collect.metrics.disk.to_string(),
+                cfg.collect.metrics.disk,
+            );
 
             theme::print_section("Plugins");
             theme::print_kv("Directory", &cfg.plugins_dir);
 
             theme::print_section("Buffer (WAL)");
             theme::print_kv("Directory", &cfg.buffer.wal_dir);
-            theme::print_kv("Segment size", &format!("{} MB", cfg.buffer.segment_size_mb));
-            theme::print_kv("Retention", &format!("{} days", cfg.buffer.max_retention_days));
+            theme::print_kv(
+                "Segment size",
+                &format!("{} MB", cfg.buffer.segment_size_mb),
+            );
+            theme::print_kv(
+                "Retention",
+                &format!("{} days", cfg.buffer.max_retention_days),
+            );
 
             theme::print_section("Security");
             theme::print_kv("Key store", &cfg.security.key_store);

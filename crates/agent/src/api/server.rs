@@ -1,9 +1,9 @@
-use axum::Router;
-use axum::routing::get;
-use tokio::net::TcpListener;
 use super::health;
 use super::metrics;
 use super::state::AgentState;
+use axum::routing::get;
+use axum::Router;
+use tokio::net::TcpListener;
 
 pub fn router(state: AgentState) -> Router {
     Router::new()

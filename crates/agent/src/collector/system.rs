@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use sysinfo::{Disks, Networks, System};
 
-use sentinel_common::proto::{Metric, MetricType, metric::Value};
 use super::naming::normalize_name;
 use super::traits::Collector;
+use sentinel_common::proto::{metric::Value, Metric, MetricType};
 
 pub struct SystemCollector {
     sys: System,
@@ -67,10 +67,26 @@ impl SystemCollector {
     fn collect_memory(&self) -> Vec<Metric> {
         let empty = HashMap::new();
         vec![
-            Self::gauge("mem.total_bytes", self.sys.total_memory() as f64, empty.clone()),
-            Self::gauge("mem.used_bytes", self.sys.used_memory() as f64, empty.clone()),
-            Self::gauge("mem.available_bytes", self.sys.available_memory() as f64, empty.clone()),
-            Self::gauge("mem.swap_total_bytes", self.sys.total_swap() as f64, empty.clone()),
+            Self::gauge(
+                "mem.total_bytes",
+                self.sys.total_memory() as f64,
+                empty.clone(),
+            ),
+            Self::gauge(
+                "mem.used_bytes",
+                self.sys.used_memory() as f64,
+                empty.clone(),
+            ),
+            Self::gauge(
+                "mem.available_bytes",
+                self.sys.available_memory() as f64,
+                empty.clone(),
+            ),
+            Self::gauge(
+                "mem.swap_total_bytes",
+                self.sys.total_swap() as f64,
+                empty.clone(),
+            ),
             Self::gauge("mem.swap_used_bytes", self.sys.used_swap() as f64, empty),
         ]
     }
@@ -81,7 +97,9 @@ impl SystemCollector {
             .flat_map(|disk| {
                 let name = disk.name().to_string_lossy().to_string();
                 let dev = if name.is_empty() {
-                    disk.mount_point().to_string_lossy().replace(['\\', '/'], "_")
+                    disk.mount_point()
+                        .to_string_lossy()
+                        .replace(['\\', '/'], "_")
                 } else {
                     name
                 };

@@ -1,6 +1,6 @@
-use wasmtime::{Caller, Linker};
-use super::host_state::HostState;
 use super::error::PluginError;
+use super::host_state::HostState;
+use wasmtime::{Caller, Linker};
 
 fn extract_string(caller: &mut Caller<'_, HostState>, ptr: i32, len: i32) -> Option<String> {
     let memory = caller.get_export("memory")?.into_memory()?;
@@ -10,16 +10,22 @@ fn extract_string(caller: &mut Caller<'_, HostState>, ptr: i32, len: i32) -> Opt
     if end > data.len() {
         return None;
     }
-    std::str::from_utf8(&data[start..end]).ok().map(String::from)
+    std::str::from_utf8(&data[start..end])
+        .ok()
+        .map(String::from)
 }
 
 pub fn register_host_fns(linker: &mut Linker<HostState>) -> Result<(), PluginError> {
     linker
-        .func_wrap("sentinel", "log", |mut caller: Caller<'_, HostState>, ptr: i32, len: i32| {
-            if let Some(msg) = extract_string(&mut caller, ptr, len) {
-                caller.data_mut().logs.push(msg);
-            }
-        })
+        .func_wrap(
+            "sentinel",
+            "log",
+            |mut caller: Caller<'_, HostState>, ptr: i32, len: i32| {
+                if let Some(msg) = extract_string(&mut caller, ptr, len) {
+                    caller.data_mut().logs.push(msg);
+                }
+            },
+        )
         .map_err(|e| PluginError::Instantiation(e.to_string()))?;
 
     linker

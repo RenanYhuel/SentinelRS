@@ -1,9 +1,9 @@
 use async_nats::jetstream;
 use prost::Message;
 
+use super::publisher::{BrokerError, BrokerPublisher};
 use sentinel_common::nats_config::subject_for_agent;
 use sentinel_common::proto::Batch;
-use super::publisher::{BrokerError, BrokerPublisher};
 
 pub struct NatsPublisher {
     js: jetstream::Context,

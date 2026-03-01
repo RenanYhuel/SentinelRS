@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::output::{OutputMode, print_json, build_table};
+    use crate::output::{build_table, print_json, OutputMode};
 
     #[test]
     fn output_mode_json() {

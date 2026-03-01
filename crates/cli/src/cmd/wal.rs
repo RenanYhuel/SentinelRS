@@ -2,10 +2,10 @@ use anyhow::Result;
 use clap::Subcommand;
 use std::path::PathBuf;
 
-use sentinel_agent::buffer::{compact, compute_stats, needs_compaction, Wal, WalMeta};
-use sentinel_agent::batch::BatchComposer;
-use crate::output::{OutputMode, print_json, print_success, build_table, spinner, theme, confirm};
 use super::helpers;
+use crate::output::{build_table, confirm, print_json, print_success, spinner, theme, OutputMode};
+use sentinel_agent::batch::BatchComposer;
+use sentinel_agent::buffer::{compact, compute_stats, needs_compaction, Wal, WalMeta};
 
 #[derive(Subcommand)]
 pub enum WalCmd {
@@ -113,7 +113,10 @@ fn inspect(args: InspectArgs, mode: OutputMode, config_path: Option<String>) -> 
                 table.add_row(vec![
                     id.to_string(),
                     format_bytes(data.len() as u64),
-                    batch.as_ref().map(|b| b.batch_id.clone()).unwrap_or_default(),
+                    batch
+                        .as_ref()
+                        .map(|b| b.batch_id.clone())
+                        .unwrap_or_default(),
                     batch
                         .as_ref()
                         .map(|b| b.metrics.len().to_string())
@@ -135,8 +138,12 @@ fn compact_cmd(args: CompactArgs, mode: OutputMode, config_path: Option<String>)
         let needed = needs_compaction(&dir, threshold)?;
         if !needed {
             match mode {
-                OutputMode::Json => print_json(&serde_json::json!({"compacted": false, "reason": "threshold not reached"}))?,
-                OutputMode::Human => print_success("Compaction not needed (threshold not reached). Use --force to override."),
+                OutputMode::Json => print_json(
+                    &serde_json::json!({"compacted": false, "reason": "threshold not reached"}),
+                )?,
+                OutputMode::Human => print_success(
+                    "Compaction not needed (threshold not reached). Use --force to override.",
+                ),
             }
             return Ok(());
         }

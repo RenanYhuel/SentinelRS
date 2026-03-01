@@ -1,7 +1,7 @@
 use sqlx::PgPool;
 
-use crate::transform::MetricRow;
 use super::retry::WriteError;
+use crate::transform::MetricRow;
 
 pub struct MetricWriter {
     pool: PgPool,

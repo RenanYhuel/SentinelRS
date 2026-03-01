@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use std::path::PathBuf;
 
-use sentinel_agent::config::{EncryptedFileStore, KeyStore};
-use crate::output::{OutputMode, print_json, print_success, spinner, theme, confirm};
 use super::helpers;
+use crate::output::{confirm, print_json, print_success, spinner, theme, OutputMode};
+use sentinel_agent::config::{EncryptedFileStore, KeyStore};
 
 #[derive(Subcommand)]
 pub enum KeyCmd {
@@ -32,11 +32,7 @@ pub struct DeleteKeyArgs {
     yes: bool,
 }
 
-pub async fn execute(
-    cmd: KeyCmd,
-    mode: OutputMode,
-    config_path: Option<String>,
-) -> Result<()> {
+pub async fn execute(cmd: KeyCmd, mode: OutputMode, config_path: Option<String>) -> Result<()> {
     match cmd {
         KeyCmd::Rotate(args) => rotate(args, mode, config_path),
         KeyCmd::List(args) => list(args, mode, config_path),
@@ -71,11 +67,9 @@ fn rotate(args: RotateArgs, mode: OutputMode, config_path: Option<String>) -> Re
     let dir = key_store_dir(config_path.as_deref())?;
     let store = EncryptedFileStore::new(&dir, master_key());
 
-    let secret_bytes = base64::Engine::decode(
-        &base64::engine::general_purpose::STANDARD,
-        &args.secret,
-    )
-    .context("invalid base64 secret")?;
+    let secret_bytes =
+        base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &args.secret)
+            .context("invalid base64 secret")?;
 
     let sp = match mode {
         OutputMode::Human => Some(spinner::create("Rotating key...")),
@@ -153,7 +147,9 @@ fn delete(args: DeleteKeyArgs, mode: OutputMode, config_path: Option<String>) ->
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     match mode {
-        OutputMode::Json => print_json(&serde_json::json!({"deleted": true, "key_id": args.key_id}))?,
+        OutputMode::Json => {
+            print_json(&serde_json::json!({"deleted": true, "key_id": args.key_id}))?
+        }
         OutputMode::Human => print_success(&format!("Key '{}' deleted", args.key_id)),
     }
 

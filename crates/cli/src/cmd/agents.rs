@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 
-use crate::output::{OutputMode, print_json, print_success, build_table, spinner, theme};
 use super::helpers;
+use crate::output::{build_table, print_json, print_success, spinner, theme, OutputMode};
 
 #[derive(Subcommand)]
 pub enum AgentsCmd {
@@ -28,11 +28,7 @@ pub async fn execute(
     }
 }
 
-async fn list(
-    mode: OutputMode,
-    server: Option<String>,
-    config_path: Option<String>,
-) -> Result<()> {
+async fn list(mode: OutputMode, server: Option<String>, config_path: Option<String>) -> Result<()> {
     let base = helpers::resolve_rest_url(server.as_deref(), config_path.as_deref())?;
     let url = format!("{base}/v1/agents");
 

@@ -1,6 +1,6 @@
-use crate::alert::AlertEvent;
 use super::channel::{Notifier, NotifyError};
 use super::dlq::DlqWriter;
+use crate::alert::AlertEvent;
 
 pub struct RetryNotifier<N: Notifier> {
     inner: N,

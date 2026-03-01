@@ -2,9 +2,9 @@ use anyhow::Result;
 use clap::Args;
 use std::path::PathBuf;
 
-use sentinel_agent::buffer::{compute_stats, Wal};
-use crate::output::{OutputMode, print_json, spinner, theme};
 use super::helpers;
+use crate::output::{print_json, spinner, theme, OutputMode};
+use sentinel_agent::buffer::{compute_stats, Wal};
 
 #[derive(Args)]
 pub struct StatusArgs;
@@ -68,7 +68,11 @@ pub async fn execute(
             theme::print_kv("Agent ID", &agent_id);
 
             theme::print_section("Server");
-            theme::print_kv_colored("Status", if server_up { "online" } else { "offline" }, server_up);
+            theme::print_kv_colored(
+                "Status",
+                if server_up { "online" } else { "offline" },
+                server_up,
+            );
 
             theme::print_section("WAL");
             if let Some(w) = &wal_info {

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Args;
 
-use crate::output::{OutputMode, print_json, spinner, theme};
 use super::helpers;
+use crate::output::{print_json, spinner, theme, OutputMode};
 
 #[derive(Args)]
 pub struct HealthArgs;
@@ -60,9 +60,7 @@ pub async fn execute(
 }
 
 async fn check_endpoint(url: &str) -> Result<()> {
-    let resp = reqwest::get(url)
-        .await
-        .context("connection failed")?;
+    let resp = reqwest::get(url).await.context("connection failed")?;
 
     if resp.status().is_success() {
         Ok(())

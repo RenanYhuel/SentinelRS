@@ -50,10 +50,7 @@ mod tests {
 
     #[test]
     fn subject_for_agent_format() {
-        assert_eq!(
-            subject_for_agent("agent-abc"),
-            "sentinel.metrics.agent-abc"
-        );
+        assert_eq!(subject_for_agent("agent-abc"), "sentinel.metrics.agent-abc");
     }
 
     #[test]

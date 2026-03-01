@@ -3,9 +3,9 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
-use sentinel_common::proto::Metric;
-use crate::collector::Collector;
 use super::jitter::apply_jitter;
+use crate::collector::Collector;
+use sentinel_common::proto::Metric;
 
 pub struct ScheduledTask {
     pub interval: Duration,

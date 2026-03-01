@@ -70,8 +70,10 @@ impl WorkerMetrics {
 
     pub fn record_processing_latency(&self, start: Instant) {
         let us = start.elapsed().as_micros() as u64;
-        self.processing_latency_sum_us.fetch_add(us, Ordering::Relaxed);
-        self.processing_latency_count.fetch_add(1, Ordering::Relaxed);
+        self.processing_latency_sum_us
+            .fetch_add(us, Ordering::Relaxed);
+        self.processing_latency_count
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn record_db_latency(&self, start: Instant) {

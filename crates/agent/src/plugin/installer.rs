@@ -18,14 +18,22 @@ pub fn sign_blob(blob: &[u8], key: &[u8]) -> Vec<u8> {
     mac.finalize().into_bytes().to_vec()
 }
 
-pub fn store_blob(plugins_dir: &Path, name: &str, blob: &[u8]) -> std::io::Result<std::path::PathBuf> {
+pub fn store_blob(
+    plugins_dir: &Path,
+    name: &str,
+    blob: &[u8],
+) -> std::io::Result<std::path::PathBuf> {
     std::fs::create_dir_all(plugins_dir)?;
     let path = plugins_dir.join(format!("{name}.wasm"));
     std::fs::write(&path, blob)?;
     Ok(path)
 }
 
-pub fn store_manifest(plugins_dir: &Path, name: &str, manifest_yaml: &str) -> std::io::Result<std::path::PathBuf> {
+pub fn store_manifest(
+    plugins_dir: &Path,
+    name: &str,
+    manifest_yaml: &str,
+) -> std::io::Result<std::path::PathBuf> {
     std::fs::create_dir_all(plugins_dir)?;
     let path = plugins_dir.join(format!("{name}.manifest.yml"));
     std::fs::write(&path, manifest_yaml)?;

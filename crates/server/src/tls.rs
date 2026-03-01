@@ -10,10 +10,9 @@ pub struct TlsIdentity {
 
 impl TlsIdentity {
     pub fn load(config: &TlsConfig) -> Result<Self, TlsLoadError> {
-        let cert_pem = fs::read(&config.cert_path)
-            .map_err(|e| TlsLoadError(format!("cert: {e}")))?;
-        let key_pem = fs::read(&config.key_path)
-            .map_err(|e| TlsLoadError(format!("key: {e}")))?;
+        let cert_pem =
+            fs::read(&config.cert_path).map_err(|e| TlsLoadError(format!("cert: {e}")))?;
+        let key_pem = fs::read(&config.key_path).map_err(|e| TlsLoadError(format!("key: {e}")))?;
         let ca_pem = config
             .ca_path
             .as_ref()
@@ -27,8 +26,7 @@ impl TlsIdentity {
     }
 
     pub fn tonic_server_tls(&self) -> Result<tonic::transport::ServerTlsConfig, TlsLoadError> {
-        let identity =
-            tonic::transport::Identity::from_pem(&self.cert_pem, &self.key_pem);
+        let identity = tonic::transport::Identity::from_pem(&self.cert_pem, &self.key_pem);
         let mut tls = tonic::transport::ServerTlsConfig::new().identity(identity);
         if let Some(ca) = &self.ca_pem {
             let ca_cert = tonic::transport::Certificate::from_pem(ca);

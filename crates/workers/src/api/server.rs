@@ -1,10 +1,10 @@
-use axum::Router;
 use axum::routing::get;
+use axum::Router;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-use crate::metrics::worker_metrics::WorkerMetrics;
 use super::{health, metrics};
+use crate::metrics::worker_metrics::WorkerMetrics;
 
 pub fn router(worker_metrics: Arc<WorkerMetrics>) -> Router {
     Router::new()
@@ -13,7 +13,10 @@ pub fn router(worker_metrics: Arc<WorkerMetrics>) -> Router {
         .route("/metrics", get(metrics::metrics).with_state(worker_metrics))
 }
 
-pub async fn serve(listener: TcpListener, worker_metrics: Arc<WorkerMetrics>) -> std::io::Result<()> {
+pub async fn serve(
+    listener: TcpListener,
+    worker_metrics: Arc<WorkerMetrics>,
+) -> std::io::Result<()> {
     let app = router(worker_metrics);
     axum::serve(listener, app).await
 }

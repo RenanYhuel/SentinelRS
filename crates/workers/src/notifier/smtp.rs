@@ -2,8 +2,8 @@ use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 
-use crate::alert::AlertEvent;
 use super::channel::{Notifier, NotifyError};
+use crate::alert::AlertEvent;
 
 pub struct SmtpNotifier {
     from: String,
@@ -12,14 +12,25 @@ pub struct SmtpNotifier {
 }
 
 impl SmtpNotifier {
-    pub fn new(host: &str, port: u16, username: &str, password: &str, from: String, to: String) -> Self {
+    pub fn new(
+        host: &str,
+        port: u16,
+        username: &str,
+        password: &str,
+        from: String,
+        to: String,
+    ) -> Self {
         let creds = Credentials::new(username.to_string(), password.to_string());
         let transport = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(host)
             .expect("valid SMTP host")
             .port(port)
             .credentials(creds)
             .build();
-        Self { from, to, transport }
+        Self {
+            from,
+            to,
+            transport,
+        }
     }
 }
 
@@ -48,8 +59,15 @@ impl Notifier for SmtpNotifier {
         );
 
         let email = Message::builder()
-            .from(self.from.parse().map_err(|e: lettre::address::AddressError| NotifyError(e.to_string()))?)
-            .to(self.to.parse().map_err(|e: lettre::address::AddressError| NotifyError(e.to_string()))?)
+            .from(
+                self.from
+                    .parse()
+                    .map_err(|e: lettre::address::AddressError| NotifyError(e.to_string()))?,
+            )
+            .to(self
+                .to
+                .parse()
+                .map_err(|e: lettre::address::AddressError| NotifyError(e.to_string()))?)
             .subject(subject)
             .header(ContentType::TEXT_PLAIN)
             .body(body)

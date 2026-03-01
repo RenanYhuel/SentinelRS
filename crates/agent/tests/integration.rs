@@ -143,8 +143,8 @@ async fn wal_to_send_to_ack_compaction_flow() {
 
     let wal_dir = tempfile::tempdir().unwrap();
 
-    use sentinel_agent::buffer::Wal;
     use sentinel_agent::batch::BatchComposer;
+    use sentinel_agent::buffer::Wal;
 
     let mut wal = Wal::open(wal_dir.path(), false, 1024 * 1024).unwrap();
     let mut composer = BatchComposer::new("agent-wal-test".into(), 0);
