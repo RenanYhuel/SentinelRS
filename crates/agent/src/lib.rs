@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod api;
 pub mod batch;
 pub mod buffer;

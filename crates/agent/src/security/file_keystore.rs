@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use aes_gcm::aead::{Aead, KeyInit, OsRng};
 use aes_gcm::{Aes256Gcm, Nonce};
@@ -77,6 +77,7 @@ impl KeyStore for EncryptedFileKeyStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn mk_store(dir: &Path) -> EncryptedFileKeyStore {
         let key = [0xABu8; 32];

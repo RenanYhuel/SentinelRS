@@ -1,13 +1,3 @@
-mod api;
-mod batch;
-mod buffer;
-mod collector;
-mod config;
-mod exporter;
-mod plugin;
-mod scheduler;
-mod security;
-
 use tracing_subscriber::EnvFilter;
 
 fn main() {
