@@ -9,6 +9,8 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("005_retention_policies.sql", include_str!("../../../../migrations/005_retention_policies.sql")),
     ("006_continuous_aggregates.sql", include_str!("../../../../migrations/006_continuous_aggregates.sql")),
     ("007_dashboard_views.sql", include_str!("../../../../migrations/007_dashboard_views.sql")),
+    ("008_create_alert_rules.sql", include_str!("../../../../migrations/008_create_alert_rules.sql")),
+    ("009_create_notifications_dlq.sql", include_str!("../../../../migrations/009_create_notifications_dlq.sql")),
 ];
 
 pub async fn run_migrations(pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {
