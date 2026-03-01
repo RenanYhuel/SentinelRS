@@ -6,6 +6,12 @@ pub struct BatchDedup {
     seen: Arc<DashMap<String, i64>>,
 }
 
+impl Default for BatchDedup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BatchDedup {
     pub fn new() -> Self {
         Self {
