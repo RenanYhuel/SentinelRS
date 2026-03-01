@@ -5,3 +5,11 @@ edition = "2021"
 
 [dependencies]
 sentinel_common = { path = "../common" }
+tokio = { version = "1", features = ["full"] }
+sysinfo = "0.35"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+prost = "0.13"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }

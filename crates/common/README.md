@@ -4,13 +4,13 @@ Shared types, Protobuf definitions and helper utilities for the SentinelRS works
 
 ## What's inside
 
-| Module | Description |
-|---|---|
-| `proto` | Auto-generated Rust types from `proto/sentinel.proto` (prost) |
-| `canonicalize` | Deterministic serialization of `Batch` for HMAC signing |
-| `batch_id` | UUID v4 batch identifier generator |
-| `seq` | Atomic monotonic sequence counter |
-| `metric_json` | Bidirectional `Metric` ↔ JSON conversion (serde) |
+| Module         | Description                                                   |
+| -------------- | ------------------------------------------------------------- |
+| `proto`        | Auto-generated Rust types from `proto/sentinel.proto` (prost) |
+| `canonicalize` | Deterministic serialization of `Batch` for HMAC signing       |
+| `batch_id`     | UUID v4 batch identifier generator                            |
+| `seq`          | Atomic monotonic sequence counter                             |
+| `metric_json`  | Bidirectional `Metric` ↔ JSON conversion (serde)              |
 
 ## Protobuf versioning
 
