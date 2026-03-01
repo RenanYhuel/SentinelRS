@@ -12,12 +12,16 @@ async fn setup_pool() -> PgPool {
 }
 
 async fn clean_tables(pool: &PgPool) {
-    let _ = sqlx::raw_sql("TRUNCATE metrics_time, metrics_raw, alerts CASCADE")
-        .execute(pool)
-        .await;
-    let _ = sqlx::raw_sql("DELETE FROM _migrations WHERE filename != '000_migration_tracking.sql'")
-        .execute(pool)
-        .await;
+    let _ = sqlx::raw_sql(
+        "DROP TABLE IF EXISTS metrics_time CASCADE;
+         DROP TABLE IF EXISTS metrics_raw CASCADE;
+         DROP TABLE IF EXISTS alerts CASCADE;
+         DROP TABLE IF EXISTS alert_rules CASCADE;
+         DROP TABLE IF EXISTS notifications_dlq CASCADE;
+         DROP TABLE IF EXISTS _migrations CASCADE;",
+    )
+    .execute(pool)
+    .await;
 }
 
 #[tokio::test]
