@@ -30,7 +30,7 @@ impl InMemoryBroker {
 
 #[tonic::async_trait]
 impl BrokerPublisher for InMemoryBroker {
-    async fn publish(&self, batch: &Batch) -> Result<(), BrokerError> {
+    async fn publish(&self, batch: &Batch, _signature: Option<&str>) -> Result<(), BrokerError> {
         self.batches.lock().await.push(batch.clone());
         self.count.fetch_add(1, Ordering::Relaxed);
         Ok(())
@@ -48,7 +48,7 @@ mod tests {
             batch_id: "b-1".into(),
             ..Default::default()
         };
-        broker.publish(&batch).await.unwrap();
+        broker.publish(&batch, None).await.unwrap();
         let stored = broker.published_batches().await;
         assert_eq!(stored.len(), 1);
         assert_eq!(stored[0].batch_id, "b-1");

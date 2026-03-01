@@ -2,7 +2,7 @@ use sentinel_common::proto::Batch;
 
 #[tonic::async_trait]
 pub trait BrokerPublisher: Send + Sync {
-    async fn publish(&self, batch: &Batch) -> Result<(), BrokerError>;
+    async fn publish(&self, batch: &Batch, signature: Option<&str>) -> Result<(), BrokerError>;
 }
 
 #[derive(Debug)]

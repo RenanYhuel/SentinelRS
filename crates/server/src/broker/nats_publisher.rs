@@ -17,13 +17,17 @@ impl NatsPublisher {
 
 #[tonic::async_trait]
 impl BrokerPublisher for NatsPublisher {
-    async fn publish(&self, batch: &Batch) -> Result<(), BrokerError> {
+    async fn publish(&self, batch: &Batch, signature: Option<&str>) -> Result<(), BrokerError> {
         let subject = subject_for_agent(&batch.agent_id);
         let payload = batch.encode_to_vec();
 
         let mut headers = async_nats::HeaderMap::new();
         headers.insert("X-Agent-Id", batch.agent_id.as_str());
         headers.insert("X-Batch-Id", batch.batch_id.as_str());
+
+        if let Some(sig) = signature {
+            headers.insert("X-Signature", sig);
+        }
 
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

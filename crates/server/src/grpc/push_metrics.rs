@@ -42,7 +42,7 @@ pub async fn handle_push_metrics(
         .unwrap_or_default()
         .as_millis() as i64;
 
-    if let Err(e) = broker.publish(&batch).await {
+    if let Err(e) = broker.publish(&batch, Some(&signature)).await {
         tracing::error!(batch_id = %batch.batch_id, error = %e, "broker publish failed");
         return Ok(Response::new(PushResponse {
             status: PushStatus::Retry.into(),
