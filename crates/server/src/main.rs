@@ -2,7 +2,7 @@ use sentinel_server::broker::InMemoryBroker;
 use sentinel_server::config::ServerConfig;
 use sentinel_server::grpc::AgentServiceImpl;
 use sentinel_server::rest::{self, AppState};
-use sentinel_server::store::{AgentStore, IdempotencyStore};
+use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
 
 use sentinel_common::proto::agent_service_server::AgentServiceServer;
 use tonic::transport::Server as TonicServer;
@@ -35,6 +35,7 @@ async fn main() {
 
     let app_state = AppState {
         agents,
+        rules: RuleStore::new(),
         jwt_secret: config.jwt_secret,
     };
     let rest_app = rest::router(app_state);
