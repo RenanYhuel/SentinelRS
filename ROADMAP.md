@@ -15,12 +15,12 @@ Règles générales de la roadmap
 Index (sections)
 
 - [x]   1. Repo & workspace
-- [ ]   2. Protobuf & common types
-- [ ]   3. Agent — architecture interne (sous-tâches)
+- [x]   2. Protobuf & common types
+- [x]   3. Agent — architecture interne (sous-tâches)
 - [x]   4. Plugins WASM
 - [x]   5. WAL (buffer local) et politiques de compaction
 - [x]   6. Exporter gRPC & Prometheus
-- [ ]   7. Server (API gateway / ingestion)
+- [x]   7. Server (API gateway / ingestion)
 - [ ]   8. Broker integration (NATS JetStream)
 - [ ]   9. Workers (consommation / transformation / stockage)
 - [ ]   10. TimescaleDB schema & storage
@@ -165,13 +165,13 @@ Notes : Prefer passer un contexte minimal au plugin pour réduire la surface d'a
 
 7. Server (API gateway / ingestion)
 
-- [ ] 7.1. Bootstrap server skeleton (tonic gRPC + axum for REST on same process or separate gateway). Include TLS via rustls.
-- [ ] 7.2. Implement `Register` RPC: validate hw_id, generate `agent_id` + secret, store in `agents` table. Return config snapshot optionally.
-- [ ] 7.3. Implement `PushMetrics` RPC handler (validation, idempotency, publish to NATS, respond OK/RETRY/REJECTED).
-- [ ] 7.4. Expose REST endpoints for dashboard: agents list, agent detail, metrics query proxy, alerts list, raw batch inspect.
-- [ ] 7.5. Add rate limiting middleware and auth for UI/API (API tokens / JWT admin key).
-- [ ] Tests : unit tests for validation logic, integration tests with NATS dev.
-- [ ] Dépendances : 2.1 (proto), 8 (NATS integration), 10 (DB for agent persistence).
+- [x] 7.1. Bootstrap server skeleton (tonic gRPC + axum for REST on same process or separate gateway). Include TLS via rustls.
+- [x] 7.2. Implement `Register` RPC: validate hw_id, generate `agent_id` + secret, store in `agents` table. Return config snapshot optionally.
+- [x] 7.3. Implement `PushMetrics` RPC handler (validation, idempotency, publish to NATS, respond OK/RETRY/REJECTED).
+- [x] 7.4. Expose REST endpoints for dashboard: agents list, agent detail, metrics query proxy, alerts list, raw batch inspect.
+- [x] 7.5. Add rate limiting middleware and auth for UI/API (API tokens / JWT admin key).
+- [x] Tests : unit tests for validation logic, integration tests with NATS dev.
+- [x] Dépendances : 2.1 (proto), 8 (NATS integration), 10 (DB for agent persistence).
 
 Notes d'implémentation : utiliser Tower middleware, stocker idempotency cache en Redis/Postgres.
 
