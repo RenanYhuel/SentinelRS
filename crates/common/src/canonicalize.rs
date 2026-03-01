@@ -1,40 +1,74 @@
-use prost::Message;
-
 use crate::proto::Batch;
-use crate::proto::Metric;
-
-fn canonicalize_metric(m: &Metric) -> Metric {
-    let mut sorted_labels: Vec<(String, String)> = m.labels.clone().into_iter().collect();
-    sorted_labels.sort_by(|a, b| a.0.cmp(&b.0));
-    Metric {
-        name: m.name.clone(),
-        labels: sorted_labels.into_iter().collect(),
-        rtype: m.rtype,
-        value: m.value.clone(),
-        timestamp_ms: m.timestamp_ms,
-    }
-}
 
 pub fn canonical_bytes(batch: &Batch) -> Vec<u8> {
-    let canonical = Batch {
-        agent_id: batch.agent_id.clone(),
-        batch_id: batch.batch_id.clone(),
-        seq_start: batch.seq_start,
-        seq_end: batch.seq_end,
-        created_at_ms: batch.created_at_ms,
-        metrics: batch.metrics.iter().map(canonicalize_metric).collect(),
-        meta: {
-            let mut sorted: Vec<(String, String)> = batch.meta.clone().into_iter().collect();
-            sorted.sort_by(|a, b| a.0.cmp(&b.0));
-            sorted.into_iter().collect()
-        },
-    };
-    canonical.encode_to_vec()
+    let mut out = Vec::new();
+    write_str(&mut out, &batch.agent_id);
+    write_str(&mut out, &batch.batch_id);
+    out.extend_from_slice(&batch.seq_start.to_le_bytes());
+    out.extend_from_slice(&batch.seq_end.to_le_bytes());
+    out.extend_from_slice(&batch.created_at_ms.to_le_bytes());
+
+    for m in &batch.metrics {
+        write_str(&mut out, &m.name);
+        let mut labels: Vec<(&String, &String)> = m.labels.iter().collect();
+        labels.sort_by_key(|(k, _)| k.as_str());
+        for (k, v) in labels {
+            write_str(&mut out, k);
+            write_str(&mut out, v);
+        }
+        out.extend_from_slice(&m.rtype.to_le_bytes());
+        if let Some(ref val) = m.value {
+            encode_value(&mut out, val);
+        }
+        out.extend_from_slice(&m.timestamp_ms.to_le_bytes());
+    }
+
+    let mut meta: Vec<(&String, &String)> = batch.meta.iter().collect();
+    meta.sort_by_key(|(k, _)| k.as_str());
+    for (k, v) in meta {
+        write_str(&mut out, k);
+        write_str(&mut out, v);
+    }
+
+    out
+}
+
+fn write_str(out: &mut Vec<u8>, s: &str) {
+    out.extend_from_slice(&(s.len() as u32).to_le_bytes());
+    out.extend_from_slice(s.as_bytes());
+}
+
+fn encode_value(out: &mut Vec<u8>, val: &crate::proto::metric::Value) {
+    use crate::proto::metric::Value;
+    match val {
+        Value::ValueDouble(d) => {
+            out.push(0x01);
+            out.extend_from_slice(&d.to_le_bytes());
+        }
+        Value::ValueInt(i) => {
+            out.push(0x02);
+            out.extend_from_slice(&i.to_le_bytes());
+        }
+        Value::Histogram(h) => {
+            out.push(0x03);
+            out.extend_from_slice(&(h.boundaries.len() as u32).to_le_bytes());
+            for b in &h.boundaries {
+                out.extend_from_slice(&b.to_le_bytes());
+            }
+            out.extend_from_slice(&(h.counts.len() as u32).to_le_bytes());
+            for c in &h.counts {
+                out.extend_from_slice(&c.to_le_bytes());
+            }
+            out.extend_from_slice(&h.sum.to_le_bytes());
+            out.extend_from_slice(&h.count.to_le_bytes());
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::proto::Metric;
     use std::collections::HashMap;
 
     fn sample_batch(labels_order: Vec<(&str, &str)>) -> Batch {
