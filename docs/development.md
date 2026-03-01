@@ -135,13 +135,17 @@ crates/
 │   └── src/
 ├── agent/           Agent binary
 │   └── src/
+│       ├── api/         Local HTTP API (health, ready, metrics)
 │       ├── buffer/      WAL (segments, compaction, CRC)
 │       ├── collector/   System metrics (sysinfo)
 │       ├── config/      YAML config loading
 │       ├── exporter/    gRPC + HTTP fallback exporters
 │       ├── plugin/      WASM runtime (wasmtime)
 │       ├── scheduler/   Collection scheduling
-│       └── security/    Key store, HMAC signer, compression
+│       ├── security/    Key store, HMAC signer, compression
+│       ├── cli.rs       CLI argument parsing
+│       ├── run.rs       Async orchestration
+│       └── shutdown.rs  Graceful shutdown
 ├── server/          Ingestion gateway
 │   └── src/
 │       ├── auth/        JWT token creation/validation

@@ -12,11 +12,15 @@ The agent reads a YAML configuration file. Default lookup paths:
 
 ```yaml
 # Assigned by the server during registration.
-# Leave null to trigger the registration flow.
+# Leave null to auto-detect from hostname.
 agent_id: null
 
 # Server URL for gRPC communication.
 server: https://sentinel.example.com:8443
+
+# Agent secret (base64-encoded). Used for HMAC batch signing.
+# Can also be set via SENTINEL_AGENT_SECRET or SENTINEL_MASTER_KEY env vars.
+secret: "base64-encoded-secret-here"
 
 # Metric collection settings.
 collect:
@@ -50,6 +54,10 @@ security:
 
     # How often to check for key rotation (hours).
     rotation_check_interval_hours: 24
+
+# Local HTTP API port for health checks and Prometheus metrics.
+# Endpoints: /healthz, /ready, /metrics
+api_port: 9090
 ```
 
 ### Validation Rules
@@ -62,18 +70,57 @@ security:
 
 Use `sentinel config validate` to check a config file before deploying.
 
+### Agent CLI Options
+
+```
+Usage: sentinel_agent [OPTIONS]
+
+Options:
+  -c, --config <PATH>  Configuration file path (required)
+  -V, --version        Print version
+  -h, --help           Print help
+```
+
+### Agent Secret Resolution
+
+The agent resolves its signing secret with the following precedence:
+
+1. `secret` field in the config file (base64-encoded)
+2. `SENTINEL_AGENT_SECRET` environment variable
+3. `SENTINEL_MASTER_KEY` environment variable
+
 ## Server Configuration
 
-The server uses a `ServerConfig` struct with hardcoded defaults. Override via environment where noted.
+The server uses a `ServerConfig` struct with defaults that can be overridden via CLI flags or environment variables.
 
-| Setting               | Default                   | Description                        |
-| --------------------- | ------------------------- | ---------------------------------- |
-| `grpc_addr`           | `0.0.0.0:50051`           | gRPC listener address              |
-| `rest_addr`           | `0.0.0.0:8080`            | REST API listener address          |
-| `jwt_secret`          | `change-me-in-production` | Secret for JWT HMAC-SHA256 signing |
-| `rate_limit_rps`      | `100`                     | Maximum requests per second        |
-| `key_grace_period_ms` | `86400000` (24h)          | Grace period after key rotation    |
-| `replay_window_ms`    | `300000` (5min)           | Time window for replay detection   |
+| Setting               | Default                   | CLI Flag       | Env Var      | Description                        |
+| --------------------- | ------------------------- | -------------- | ------------ | ---------------------------------- |
+| `grpc_addr`           | `0.0.0.0:50051`           | `--grpc-addr`  | `GRPC_ADDR`  | gRPC listener address              |
+| `rest_addr`           | `0.0.0.0:8080`            | `--rest-addr`  | `REST_ADDR`  | REST API listener address          |
+| `jwt_secret`          | `change-me-in-production` | `--jwt-secret` | `JWT_SECRET` | Secret for JWT HMAC-SHA256 signing |
+| `rate_limit_rps`      | `100`                     | —              | —            | Maximum requests per second        |
+| `key_grace_period_ms` | `86400000` (24h)          | —              | —            | Grace period after key rotation    |
+| `replay_window_ms`    | `300000` (5min)           | —              | —            | Time window for replay detection   |
+
+**Precedence:** CLI flags > environment variables > defaults.
+
+### Server CLI Options
+
+```
+Usage: sentinel_server [OPTIONS]
+
+Options:
+      --grpc-addr <ADDR>   gRPC listen address  (default: 0.0.0.0:50051)
+      --grpc-port <PORT>   gRPC listen port     (default: 50051)
+      --rest-addr <ADDR>   REST listen address  (default: 0.0.0.0:8080)
+      --rest-port <PORT>   REST listen port     (default: 8080)
+      --jwt-secret <KEY>   JWT signing secret
+      --tls-cert <PATH>    TLS certificate path
+      --tls-key <PATH>     TLS private key path
+      --tls-ca <PATH>      TLS CA certificate path
+  -V, --version            Print version
+  -h, --help               Print help
+```
 
 ### TLS
 
@@ -120,13 +167,19 @@ Default stream configuration used by the workers:
 
 ## Environment Variables Summary
 
-| Variable              | Used By      | Description                                                          |
-| --------------------- | ------------ | -------------------------------------------------------------------- |
-| `RUST_LOG`            | All binaries | Tracing filter (e.g., `info`, `debug`, `sentinel_agent=trace`)       |
-| `NATS_URL`            | Workers      | NATS connection URL                                                  |
-| `BATCH_SIZE`          | Workers      | Messages per pull batch                                              |
-| `WORKER_API_ADDR`     | Workers      | Worker HTTP bind address                                             |
-| `SENTINEL_MASTER_KEY` | CLI / Agent  | AES-256-GCM master key for encrypted key store (first 32 bytes used) |
+| Variable                | Used By      | Description                                                          |
+| ----------------------- | ------------ | -------------------------------------------------------------------- |
+| `RUST_LOG`              | All binaries | Tracing filter (e.g., `info`, `debug`, `sentinel_agent=trace`)       |
+| `NATS_URL`              | Workers      | NATS connection URL                                                  |
+| `BATCH_SIZE`            | Workers      | Messages per pull batch                                              |
+| `WORKER_API_ADDR`       | Workers      | Worker HTTP bind address                                             |
+| `SENTINEL_MASTER_KEY`   | CLI / Agent  | AES-256-GCM master key for encrypted key store (first 32 bytes used) |
+| `SENTINEL_AGENT_SECRET` | Agent        | Agent signing secret (alternative to config `secret` field)          |
+| `GRPC_ADDR`             | Server       | Full gRPC listen address (e.g. `0.0.0.0:50051`)                      |
+| `GRPC_PORT`             | Server       | gRPC port only (e.g. `50051`)                                        |
+| `REST_ADDR`             | Server       | Full REST listen address (e.g. `0.0.0.0:8080`)                       |
+| `REST_PORT`             | Server       | REST port only (e.g. `8080`)                                         |
+| `JWT_SECRET`            | Server       | JWT signing secret                                                   |
 
 ## WASM Plugin Manifest
 

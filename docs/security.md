@@ -6,7 +6,7 @@ SentinelRS implements defense-in-depth across transport, data integrity, key man
 
 ### Server-side TLS
 
-The server supports TLS on both gRPC (`:50051`) and REST (`:8080`) listeners. Configure via:
+The server supports TLS on both gRPC (default `:50051`) and REST (default `:8080`) listeners. Ports are configurable via `--grpc-port` / `--rest-port` flags or `GRPC_ADDR` / `REST_ADDR` environment variables. Configure TLS via:
 
 ```yaml
 tls:
