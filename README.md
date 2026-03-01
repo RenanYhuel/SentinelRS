@@ -81,8 +81,12 @@ cargo build --workspace --release
 ### 4. Run
 
 ```bash
-# Server (gRPC :50051 + REST :8080)
+# Server (gRPC :50051 + REST :8080 by default)
 ./target/release/sentinel_server
+
+# Server with custom ports
+./target/release/sentinel_server --grpc-port 9051 --rest-port 3000
+# or via env: GRPC_PORT=9051 REST_PORT=3000 ./target/release/sentinel_server
 
 # Workers (connects to NATS + TimescaleDB)
 NATS_URL=nats://127.0.0.1:4222 ./target/release/sentinel_workers

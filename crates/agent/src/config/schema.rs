@@ -4,11 +4,18 @@ use serde::{Deserialize, Serialize};
 pub struct AgentConfig {
     pub agent_id: Option<String>,
     pub server: String,
+    pub secret: Option<String>,
     pub collect: CollectConfig,
     #[serde(default = "default_plugins_dir")]
     pub plugins_dir: String,
     pub buffer: BufferConfig,
     pub security: SecurityConfig,
+    #[serde(default = "default_api_port")]
+    pub api_port: u16,
+}
+
+fn default_api_port() -> u16 {
+    9090
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

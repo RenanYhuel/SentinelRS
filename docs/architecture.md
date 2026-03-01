@@ -55,27 +55,34 @@ Shared library used by all other crates.
 
 Standalone binary that runs on each monitored host.
 
-| Module | Purpose |
-|---|---|
-| `collector/` | System metrics collection via `sysinfo` (CPU, memory, disk) |
-| `plugin/` | WASM plugin runtime (wasmtime) — manifest loading, sandboxed execution, host functions |
-| `buffer/` | Append-only WAL with segmented files, CRC32 integrity, compaction |
-| `scheduler/` | Periodic collection scheduling |
-| `exporter/` | gRPC exporter (primary) + HTTP fallback |
-| `batch.rs` | Batching collected metrics into protobuf messages |
-| `security/` | Encrypted key store (AES-256-GCM), HMAC signer, compression |
-| `config/` | YAML config loading and validation |
+| Module        | Purpose                                                                                |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `collector/`  | System metrics collection via `sysinfo` (CPU, memory, disk)                            |
+| `plugin/`     | WASM plugin runtime (wasmtime) — manifest loading, sandboxed execution, host functions |
+| `buffer/`     | Append-only WAL with segmented files, CRC32 integrity, compaction                      |
+| `scheduler/`  | Periodic collection scheduling                                                         |
+| `exporter/`   | gRPC exporter (primary) + HTTP fallback                                                |
+| `batch.rs`    | Batching collected metrics into protobuf messages                                      |
+| `security/`   | Encrypted key store (AES-256-GCM), HMAC signer, compression                            |
+| `config/`     | YAML config loading and validation                                                     |
+| `cli.rs`      | CLI argument parsing (`--config`, `--help`, `--version`)                               |
+| `run.rs`      | Async orchestration — wires all modules together                                       |
+| `shutdown.rs` | Graceful shutdown on SIGTERM/SIGINT                                                    |
+| `api/`        | Local HTTP API — health checks and Prometheus metrics                                  |
 
 ### sentinel_server
 
 Stateless ingestion gateway. Runs two listeners concurrently:
 
-| Component | Port | Purpose |
-|---|---|---|
-| gRPC server | 50051 | Agent registration, metric push, heartbeats |
-| REST API | 8080 | Admin endpoints — agents, rules, notifiers, metrics, health |
+| Component   | Default Port | Purpose                                                     |
+| ----------- | ------------ | ----------------------------------------------------------- |
+| gRPC server | 50051        | Agent registration, metric push, heartbeats                 |
+| REST API    | 8080         | Admin endpoints — agents, rules, notifiers, metrics, health |
+
+Both ports are configurable via CLI flags (`--grpc-port`, `--rest-port`) or environment variables (`GRPC_ADDR`, `REST_ADDR`).
 
 Internal components:
+
 - **Auth** — Hand-rolled JWT (HMAC-SHA256) for REST, HMAC signature verification for gRPC batches
 - **Middleware** — Rate limiting (configurable RPS), replay window enforcement
 - **Broker** — In-memory NATS publisher (publishes validated batches to JetStream)
@@ -85,14 +92,14 @@ Internal components:
 
 Background processing service. Connects to both NATS and TimescaleDB.
 
-| Module | Purpose |
-|---|---|
-| `consumer/` | NATS JetStream pull consumer — durable, explicit ack, max 5 redeliveries |
-| `aggregator/` | Rolling time-series windows — avg, min, max, last, count per (agent, metric) |
-| `alert/` | Rule evaluation engine with FSM state tracking (Ok → Pending → Firing → Resolved) |
-| `dedup/` | Batch deduplication |
-| `metrics/` | Worker-level Prometheus metrics |
-| `api/` | Health/metrics HTTP endpoint |
+| Module        | Purpose                                                                           |
+| ------------- | --------------------------------------------------------------------------------- |
+| `consumer/`   | NATS JetStream pull consumer — durable, explicit ack, max 5 redeliveries          |
+| `aggregator/` | Rolling time-series windows — avg, min, max, last, count per (agent, metric)      |
+| `alert/`      | Rule evaluation engine with FSM state tracking (Ok → Pending → Firing → Resolved) |
+| `dedup/`      | Batch deduplication                                                               |
+| `metrics/`    | Worker-level Prometheus metrics                                                   |
+| `api/`        | Health/metrics HTTP endpoint                                                      |
 
 ### sentinel_cli
 
@@ -106,14 +113,14 @@ Full reference: [cli.md](cli.md)
 
 TimescaleDB (PostgreSQL 14+) with the following tables:
 
-| Table | Type | Purpose |
-|---|---|---|
-| `metrics_time` | Hypertable (1-day chunks) | Structured metric storage with labels |
-| `metrics_raw` | Hypertable (1-day chunks) | Raw batch payloads (JSONB) |
-| `alerts` | Regular table | Alert events (firing/resolved) |
-| `alert_rules` | Regular table | Alert rule definitions |
-| `notifications_dlq` | Regular table | Failed notification dead-letter queue |
-| `mv_metrics_1h` | Continuous aggregate | 1-hour rollups (avg, min, max, count) |
+| Table               | Type                      | Purpose                               |
+| ------------------- | ------------------------- | ------------------------------------- |
+| `metrics_time`      | Hypertable (1-day chunks) | Structured metric storage with labels |
+| `metrics_raw`       | Hypertable (1-day chunks) | Raw batch payloads (JSONB)            |
+| `alerts`            | Regular table             | Alert events (firing/resolved)        |
+| `alert_rules`       | Regular table             | Alert rule definitions                |
+| `notifications_dlq` | Regular table             | Failed notification dead-letter queue |
+| `mv_metrics_1h`     | Continuous aggregate      | 1-hour rollups (avg, min, max, count) |
 
 Views: `v_top_metrics`, `v_recent_values`, `v_active_alerts`.
 

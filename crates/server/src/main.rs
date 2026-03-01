@@ -18,7 +18,7 @@ async fn main() {
         .json()
         .init();
 
-    let config = ServerConfig::default();
+    let config = ServerConfig::from_env_and_args();
     let agents = AgentStore::new();
     let idempotency = IdempotencyStore::new();
     let broker = InMemoryBroker::new();

@@ -58,15 +58,25 @@ for f in migrations/*.sql; do psql -h localhost -U postgres -d sentinel -f "$f";
 ### Server
 
 ```bash
-# Required: NATS must be reachable
-# Optional: RUST_LOG for log verbosity
+# Default ports (gRPC :50051, REST :8080)
 RUST_LOG=info ./sentinel_server
+
+# Custom ports via CLI flags
+./sentinel_server --grpc-port 9051 --rest-port 3000
+
+# Custom ports via environment variables
+GRPC_PORT=9051 REST_PORT=3000 ./sentinel_server
+
+# Full address override
+./sentinel_server --grpc-addr 127.0.0.1:9051 --rest-addr 127.0.0.1:3000
 ```
 
 The server starts two listeners concurrently:
 
-- **gRPC** on `0.0.0.0:50051` — agent registration, metric push, heartbeats
-- **REST** on `0.0.0.0:8080` — admin API, health checks, Prometheus metrics
+- **gRPC** on `0.0.0.0:50051` (default) — agent registration, metric push, heartbeats
+- **REST** on `0.0.0.0:8080` (default) — admin API, health checks, Prometheus metrics
+
+Both ports are configurable via CLI flags (`--grpc-port`, `--rest-port`) or environment variables (`GRPC_PORT`, `REST_PORT`, `GRPC_ADDR`, `REST_ADDR`). CLI flags take precedence over env vars.
 
 ### Workers
 
@@ -87,8 +97,25 @@ RUST_LOG=info \
 ### Agent
 
 ```bash
+# Start with a config file (required)
 ./sentinel_agent --config /etc/sentinel/agent.yml
+
+# With explicit secret via environment
+SENTINEL_MASTER_KEY="your-32-byte-key" ./sentinel_agent --config agent.yml
+
+# Version and help
+./sentinel_agent --version
+./sentinel_agent --help
 ```
+
+The agent:
+
+- Loads and validates the YAML config
+- Starts periodic system metric collection (CPU, memory, disk)
+- Writes batches to the local WAL
+- Exports batches to the server via gRPC (with automatic retry and reconnection)
+- Exposes `/healthz`, `/ready` and `/metrics` on the configured `api_port` (default: 9090)
+- Shuts down gracefully on SIGTERM / SIGINT
 
 See [configuration.md](configuration.md) for all agent settings.
 
@@ -143,7 +170,8 @@ When `ca_path` is set, the server requires client certificates (mutual TLS).
 
 ### Monitoring
 
-- [ ] Scrape `/metrics` from the server (`:8080/metrics`) for Prometheus
+- [ ] Scrape `/metrics` from the server (`:8080/metrics` or configured REST port) for Prometheus
+- [ ] Scrape agent health endpoint (`:9090/metrics` or configured `api_port`)
 - [ ] Scrape worker health endpoint (`:9090`)
 - [ ] Monitor the `notifications_dlq` table for failed alert deliveries
 - [ ] Set up alerts on SentinelRS's own health endpoints (`/healthz`, `/ready`)
