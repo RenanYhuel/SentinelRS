@@ -236,11 +236,11 @@ Operational notes : Start with single stream; expose scripts `deploy/nats-setup.
 
 10. TimescaleDB schema & storage
 
-- [ ] 10.1. Define hypertables for `metrics_time` and create necessary indexes.
-- [ ] 10.2. Create `metrics_raw` JSONB table for raw batches with retention policy.
-- [ ] 10.3. Implement migrations (diesel/sqlx migration scripts). Put migrations in `migrations/` folder.
-- [ ] 10.4. Add views/materialized views for dashboard queries (top metrics, recent values).
-- [ ] Tests : run migrations and execute sample inserts + query correctness.
+- [x] 10.1. Define hypertables for `metrics_time` and create necessary indexes.
+- [x] 10.2. Create `metrics_raw` JSONB table for raw batches with retention policy.
+- [x] 10.3. Implement migrations (diesel/sqlx migration scripts). Put migrations in `migrations/` folder.
+- [x] 10.4. Add views/materialized views for dashboard queries (top metrics, recent values).
+- [x] Tests : run migrations and execute sample inserts + query correctness.
 
 Notes : Use TimescaleDB native functions for downsampling & continuous aggregates where appropriate.
 
