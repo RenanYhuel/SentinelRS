@@ -24,8 +24,8 @@ impl Segment {
     pub fn append(&mut self, record: &Record, fsync: bool) -> io::Result<()> {
         let bytes = record.encode();
         self.writer.write_all(&bytes)?;
+        self.writer.flush()?;
         if fsync {
-            self.writer.flush()?;
             self.writer.get_ref().sync_data()?;
         }
         self.count += 1;
