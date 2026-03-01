@@ -21,7 +21,7 @@ Index (sections)
 - [x]   5. WAL (buffer local) et politiques de compaction
 - [x]   6. Exporter gRPC & Prometheus
 - [x]   7. Server (API gateway / ingestion)
-- [ ]   8. Broker integration (NATS JetStream)
+- [x]   8. Broker integration (NATS JetStream)
 - [ ]   9. Workers (consommation / transformation / stockage)
 - [ ]   10. TimescaleDB schema & storage
 - [ ]   11. Alert engine & notifiers
@@ -179,10 +179,10 @@ Notes d'implémentation : utiliser Tower middleware, stocker idempotency cache e
 
 8. Broker integration (NATS JetStream)
 
-- [ ] 8.1. Define stream `sentinel.metrics` configuration: retention, max_bytes, subjects.
-- [ ] 8.2. Implement publisher in server: create JetStream context, publish with headers (agent_id,batch_id,received_at).
-- [ ] 8.3. Implement durable consumer groups for workers; plan subject partitioning by agent prefix if scaling needed.
-- [ ] Tests : local NATS dev compose, publish and check message stored and retrievable.
+- [x] 8.1. Define stream `sentinel.metrics` configuration: retention, max_bytes, subjects.
+- [x] 8.2. Implement publisher in server: create JetStream context, publish with headers (agent_id,batch_id,received_at).
+- [x] 8.3. Implement durable consumer groups for workers; plan subject partitioning by agent prefix if scaling needed.
+- [x] Tests : local NATS dev compose, publish and check message stored and retrievable.
 
 Operational notes : Start with single stream; expose scripts `deploy/nats-setup.sh` to create stream & consumers.
 
