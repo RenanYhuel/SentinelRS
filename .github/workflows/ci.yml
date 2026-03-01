@@ -82,11 +82,11 @@ jobs:
             - uses: dtolnay/rust-toolchain@stable
               with:
                   targets: ${{ matrix.target }}
-            - name: Install protoc
+            - name: Install system dependencies
               shell: bash
               run: |
                   if [ "$RUNNER_OS" = "Linux" ]; then
-                    sudo apt-get update && sudo apt-get install -y protobuf-compiler
+                    sudo apt-get update && sudo apt-get install -y protobuf-compiler libssl-dev pkg-config
                   elif [ "$RUNNER_OS" = "macOS" ]; then
                     brew install protobuf
                   elif [ "$RUNNER_OS" = "Windows" ]; then
@@ -101,7 +101,7 @@ jobs:
                   key: ${{ runner.os }}-build-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
                   restore-keys: ${{ runner.os }}-build-${{ matrix.target }}-
             - run: cargo build --release --target ${{ matrix.target }}
-            - name: Package binaries (Unix)
+            - name: Package binaries (Linux/macOS)
               if: runner.os != 'Windows'
               run: |
                   mkdir -p dist
@@ -109,7 +109,7 @@ jobs:
                   cp target/${{ matrix.target }}/release/sentinel_server dist/ || true
                   cp target/${{ matrix.target }}/release/sentinel_workers dist/ || true
                   cp target/${{ matrix.target }}/release/sentinel_cli dist/ || true
-                  cd dist && zip ../sentinel-${{ matrix.target }}.zip *
+                  tar -czf sentinel-${{ matrix.target }}.tar.gz -C dist .
             - name: Package binaries (Windows)
               if: runner.os == 'Windows'
               shell: pwsh
@@ -123,7 +123,7 @@ jobs:
             - uses: actions/upload-artifact@v4
               with:
                   name: sentinel-${{ matrix.target }}
-                  path: sentinel-${{ matrix.target }}.zip
+                  path: sentinel-${{ matrix.target }}.*
 
     integration-smoke:
         name: Integration Smoke
