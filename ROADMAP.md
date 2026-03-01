@@ -144,12 +144,12 @@ Notes : Prefer passer un contexte minimal au plugin pour réduire la surface d'a
 
 5. WAL (append-only) détaillé
 
-- [ ] 5.1. Implement append-only writer: write then fsync optionally.
-- [ ] 5.2. Implement index file `wal.meta.json` storing head offset, tail offsets, last_seq, unacked_count.
-- [ ] 5.3. Implement ack marking: append tombstone entry or update index; plan compaction to rewrite only unacked records.
-- [ ] 5.4. Implement compaction job: schedule when free space < threshold or on trigger; compaction must be atomic (write new files then fsync and swap).
-- [ ] 5.5. Expose WAL metrics (size, unacked count) to Prometheus.
-- [ ] Tests : crash simulation (kill process after append without ack) and recovery ensures no data loss and ordering preserved.
+- [x] 5.1. Implement append-only writer: write then fsync optionally.
+- [x] 5.2. Implement index file `wal.meta.json` storing head offset, tail offsets, last_seq, unacked_count.
+- [x] 5.3. Implement ack marking: append tombstone entry or update index; plan compaction to rewrite only unacked records.
+- [x] 5.4. Implement compaction job: schedule when free space < threshold or on trigger; compaction must be atomic (write new files then fsync and swap).
+- [x] 5.5. Expose WAL metrics (size, unacked count) to Prometheus.
+- [x] Tests : crash simulation (kill process after append without ack) and recovery ensures no data loss and ordering preserved.
 
 ---
 
