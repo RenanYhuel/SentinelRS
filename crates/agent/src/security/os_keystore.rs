@@ -7,6 +7,12 @@ pub struct OsKeyStore {
     inner: Mutex<HashMap<String, Vec<u8>>>,
 }
 
+impl Default for OsKeyStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OsKeyStore {
     pub fn new() -> Self {
         Self {

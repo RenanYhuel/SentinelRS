@@ -11,6 +11,12 @@ pub struct SystemCollector {
     networks: Networks,
 }
 
+impl Default for SystemCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SystemCollector {
     pub fn new() -> Self {
         Self {
