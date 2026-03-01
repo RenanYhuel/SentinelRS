@@ -4,6 +4,7 @@ mod fingerprint;
 mod rule;
 mod state;
 mod store;
+pub mod test_harness;
 
 pub use evaluator::Evaluator;
 pub use event::{AlertEvent, AlertStatus};
