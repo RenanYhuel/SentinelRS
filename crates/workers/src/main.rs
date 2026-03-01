@@ -1,10 +1,15 @@
+use std::sync::Arc;
+
 use sentinel_common::nats_config::StreamConfig;
 use sentinel_common::trace_id::generate_trace_id;
 use sentinel_workers::api;
 use sentinel_workers::consumer::{
     connect_jetstream, create_pull_consumer, ensure_stream, ConsumerLoop,
 };
+use sentinel_workers::ingestion::IngestPipeline;
 use sentinel_workers::metrics::worker_metrics::WorkerMetrics;
+use sentinel_workers::storage::{create_pool, migrator};
+use tracing::Instrument;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -16,6 +21,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .json()
         .init();
 
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let max_db_connections: u32 = std::env::var("MAX_DB_CONNECTIONS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
     let nats_url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://127.0.0.1:4222".into());
     let batch_size: usize = std::env::var("BATCH_SIZE")
         .ok()
@@ -23,7 +33,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .unwrap_or(50);
     let api_addr = std::env::var("WORKER_API_ADDR").unwrap_or_else(|_| "0.0.0.0:9090".into());
 
+    let pool = create_pool(&database_url, max_db_connections).await?;
+    tracing::info!("database pool created");
+
+    let applied = migrator::run_migrations(&pool).await?;
+    if !applied.is_empty() {
+        tracing::info!(?applied, "migrations applied");
+    }
+
     let worker_metrics = WorkerMetrics::new();
+    let pipeline = Arc::new(IngestPipeline::new(pool, worker_metrics.clone()));
 
     let api_metrics = worker_metrics.clone();
     let api_handle = tokio::spawn(async move {
@@ -45,12 +64,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let consumer_loop = ConsumerLoop::new(consumer, batch_size);
     let consumer_handle = tokio::spawn(async move {
         consumer_loop
-            .run(|batch, batch_id| async move {
-                let trace_id = generate_trace_id();
-                let bid = batch_id.as_deref().unwrap_or("unknown");
-                let _span = tracing::info_span!("process_batch", %trace_id, batch_id = bid, agent_id = %batch.agent_id).entered();
-                tracing::info!(metrics = batch.metrics.len(), "received batch (processing stub)");
-                Ok(())
+            .run(|batch, batch_id| {
+                let pipeline = Arc::clone(&pipeline);
+                async move {
+                    let trace_id = generate_trace_id();
+                    let bid = batch_id.as_deref().unwrap_or("unknown");
+                    let span = tracing::info_span!("process_batch", %trace_id, batch_id = bid, agent_id = %batch.agent_id);
+                    pipeline.ingest(&batch).instrument(span).await
+                }
             })
             .await
     });

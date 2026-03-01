@@ -3,6 +3,7 @@ pub mod alert;
 pub mod api;
 pub mod consumer;
 pub mod dedup;
+pub mod ingestion;
 pub mod metrics;
 pub mod notifier;
 pub mod storage;
