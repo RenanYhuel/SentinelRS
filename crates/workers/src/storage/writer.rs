@@ -30,7 +30,7 @@ impl MetricWriter {
             let hist_count = row.histogram_count.map(|c| c as i64);
 
             sqlx::query(
-                r#"INSERT INTO metrics_raw
+                r#"INSERT INTO metrics_time
                    (time, agent_id, name, labels, metric_type, value,
                     histogram_boundaries, histogram_counts, histogram_count, histogram_sum)
                    VALUES

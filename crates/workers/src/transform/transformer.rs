@@ -31,22 +31,11 @@ fn transform_metric(agent_id: &str, m: &proto::Metric) -> MetricRow {
         None => (None, None, None, None, None),
     };
 
-    let mut labels = m.labels.clone();
-    let keys: Vec<String> = labels.keys().cloned().collect();
-    let mut sorted_labels = std::collections::HashMap::new();
-    let mut sorted_keys = keys;
-    sorted_keys.sort();
-    for k in sorted_keys {
-        if let Some(v) = labels.remove(&k) {
-            sorted_labels.insert(k, v);
-        }
-    }
-
     MetricRow {
         time_ms: m.timestamp_ms,
         agent_id: agent_id.to_string(),
         name: m.name.clone(),
-        labels: sorted_labels,
+        labels: m.labels.clone(),
         metric_type: metric_type.to_string(),
         value,
         histogram_boundaries: hist_bounds,
@@ -124,12 +113,12 @@ mod tests {
     }
 
     #[test]
-    fn labels_sorted() {
+    fn labels_preserved() {
         let rows = transform_batch(&gauge_batch());
-        let keys: Vec<&String> = rows[0].labels.keys().collect();
-        let mut sorted = keys.clone();
-        sorted.sort();
-        assert_eq!(keys, sorted);
+        let labels = &rows[0].labels;
+        assert_eq!(labels.get("host").unwrap(), "srv1");
+        assert_eq!(labels.get("core").unwrap(), "0");
+        assert_eq!(labels.len(), 2);
     }
 
     #[test]
