@@ -32,7 +32,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut wal = Wal::open(dir.path(), false, 16 * 1024 * 1024).unwrap();
         let id = wal.append(b"test-data".to_vec()).unwrap();
-        assert!(id > 0 || id == 0);
+        assert!(id >= 0);
         let entries = wal.iter_unacked().unwrap();
         assert_eq!(entries.len(), 1);
     }

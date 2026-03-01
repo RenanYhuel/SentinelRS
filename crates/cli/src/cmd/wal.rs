@@ -149,11 +149,12 @@ fn compact_cmd(args: CompactArgs, mode: OutputMode, config_path: Option<String>)
         }
     }
 
-    if mode == OutputMode::Human && !args.yes {
-        if !confirm::confirm_action("Compact WAL? This rewrites segment files.") {
-            theme::print_dim("  Cancelled.");
-            return Ok(());
-        }
+    if mode == OutputMode::Human
+        && !args.yes
+        && !confirm::confirm_action("Compact WAL? This rewrites segment files.")
+    {
+        theme::print_dim("  Cancelled.");
+        return Ok(());
     }
 
     let sp = match mode {
