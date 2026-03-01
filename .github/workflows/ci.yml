@@ -111,14 +111,14 @@ jobs:
         needs: test
         services:
             nats:
-                image: nats:2.10
+                image: nats:2.10-alpine
                 ports:
                     - 14222:4222
                 options: >-
-                    --health-cmd "true"
+                    --health-cmd "nc -z localhost 4222 || exit 1"
                     --health-interval 3s
                     --health-timeout 3s
-                    --health-retries 5
+                    --health-retries 10
             timescaledb:
                 image: timescale/timescaledb:latest-pg14
                 env:
