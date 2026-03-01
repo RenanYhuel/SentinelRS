@@ -1,4 +1,3 @@
-````md
 # SentinelRS
 
 Lightweight distributed monitoring system written in Rust.
@@ -74,4 +73,3 @@ See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 ## License
 
 MIT
-````
