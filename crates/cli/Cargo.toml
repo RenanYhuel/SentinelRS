@@ -4,4 +4,24 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+sentinel_common = { path = "../common" }
+sentinel_agent = { path = "../agent" }
 clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+tonic = "0.12"
+prost = "0.13"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+reqwest = { version = "0.12", features = ["json"] }
+base64 = "0.22"
+comfy-table = "7"
+colored = "2"
+chrono = "0.4"
+anyhow = "1"
+dirs = "5"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["full", "test-util"] }
+wiremock = "0.6"
