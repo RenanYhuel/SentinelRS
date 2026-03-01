@@ -1,6 +1,6 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct AgentConfig {
     pub agent_id: Option<String>,
     pub server: String,
@@ -11,13 +11,13 @@ pub struct AgentConfig {
     pub security: SecurityConfig,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CollectConfig {
     pub interval_seconds: u64,
     pub metrics: MetricsToggle,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct MetricsToggle {
     #[serde(default = "yes")]
     pub cpu: bool,
@@ -27,7 +27,7 @@ pub struct MetricsToggle {
     pub disk: bool,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct BufferConfig {
     pub wal_dir: String,
     #[serde(default = "default_segment_size")]
@@ -36,7 +36,7 @@ pub struct BufferConfig {
     pub max_retention_days: u64,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecurityConfig {
     #[serde(default = "default_key_store")]
     pub key_store: String,
