@@ -177,7 +177,7 @@ async fn wal_to_send_to_ack_compaction_flow() {
         assert_eq!(resp.status, 0);
         wal.ack(record_id);
     }
-    wal.persist_acked().unwrap();
+    wal.save_meta().unwrap();
 
     let remaining: Vec<_> = wal.iter_unacked().unwrap();
     assert!(remaining.is_empty());

@@ -3,6 +3,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::meta::WalMeta;
 use super::record::Record;
 use super::segment::Segment;
 
@@ -20,9 +21,10 @@ impl Wal {
     pub fn open(dir: &Path, fsync: bool, max_segment_bytes: u64) -> io::Result<Self> {
         fs::create_dir_all(dir)?;
 
-        let mut segment_index = 0u64;
-        let mut next_id = 0u64;
-        let mut acked = HashSet::new();
+        let meta = WalMeta::load(dir)?;
+        let mut segment_index = meta.last_segment;
+        let mut next_id = meta.tail_seq;
+        let acked: HashSet<u64> = meta.acked_set();
 
         let mut entries: Vec<_> = fs::read_dir(dir)?
             .filter_map(|e| e.ok())
@@ -50,12 +52,6 @@ impl Wal {
                         segment_index = idx + 1;
                     }
                 }
-            }
-        }
-
-        if let Ok(meta) = fs::read_to_string(dir.join("wal.acked.json")) {
-            if let Ok(ids) = serde_json::from_str::<Vec<u64>>(&meta) {
-                acked.extend(ids);
             }
         }
 
@@ -121,11 +117,34 @@ impl Wal {
         Ok(self.iter_unacked()?.len())
     }
 
-    pub fn persist_acked(&self) -> io::Result<()> {
-        let ids: Vec<u64> = self.acked.iter().copied().collect();
-        let json = serde_json::to_string(&ids)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-        fs::write(self.dir.join("wal.acked.json"), json)
+    pub fn save_meta(&self) -> io::Result<WalMeta> {
+        let head = self.head_seq();
+        let meta = WalMeta {
+            head_seq: head,
+            tail_seq: self.next_id,
+            last_segment: self.segment_index,
+            acked_ids: self.acked.iter().copied().collect(),
+        };
+        meta.save(&self.dir)?;
+        Ok(meta)
+    }
+
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    fn head_seq(&self) -> u64 {
+        if self.acked.is_empty() {
+            return 0;
+        }
+        let mut min_unacked = self.next_id;
+        for id in 0..self.next_id {
+            if !self.acked.contains(&id) {
+                min_unacked = id;
+                break;
+            }
+        }
+        min_unacked
     }
 
     fn rotate(&mut self) -> io::Result<()> {
@@ -174,7 +193,7 @@ mod tests {
             let mut wal = Wal::open(dir.path(), true, 1024 * 1024).unwrap();
             wal.append(b"persistent".to_vec()).unwrap();
             wal.ack(0);
-            wal.persist_acked().unwrap();
+            wal.save_meta().unwrap();
         }
         {
             let wal = Wal::open(dir.path(), true, 1024 * 1024).unwrap();

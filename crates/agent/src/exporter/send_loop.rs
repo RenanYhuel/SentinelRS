@@ -52,7 +52,7 @@ impl SendLoop {
             }
         }
 
-        wal.persist_acked()?;
+        wal.save_meta()?;
         Ok(sent_count)
     }
 }
