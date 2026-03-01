@@ -25,8 +25,7 @@ impl Interceptor for AuthInterceptor {
         if let Some(ref kid) = self.key_id {
             meta.insert(
                 "x-key-id",
-                MetadataValue::try_from(kid)
-                    .map_err(|_| Status::internal("invalid key id"))?,
+                MetadataValue::try_from(kid).map_err(|_| Status::internal("invalid key id"))?,
             );
         }
         Ok(request)

@@ -86,13 +86,19 @@ mod tests {
             hw_id: "hw-123".into(),
             agent_version: "0.1.0".into(),
         });
-        let resp1 = handle_register(&store, None, req1).await.unwrap().into_inner();
+        let resp1 = handle_register(&store, None, req1)
+            .await
+            .unwrap()
+            .into_inner();
 
         let req2 = Request::new(RegisterRequest {
             hw_id: "hw-123".into(),
             agent_version: "0.2.0".into(),
         });
-        let resp2 = handle_register(&store, None, req2).await.unwrap().into_inner();
+        let resp2 = handle_register(&store, None, req2)
+            .await
+            .unwrap()
+            .into_inner();
 
         assert_eq!(resp1.agent_id, resp2.agent_id);
         assert_eq!(resp1.secret, resp2.secret);
