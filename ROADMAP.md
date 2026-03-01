@@ -283,11 +283,11 @@ Notes : Use TimescaleDB native functions for downsampling & continuous aggregate
 
 15. Sécurité et provisioning
 
-- [ ] 15.1. Implement server provisioning flow: Register RPC stores `agent_id` + `secret` in `agents` table with metadata (kid versioning support).
-- [ ] 15.2. Key rotation endpoints and server logic to accept old keys during grace period.
-- [ ] 15.3. Secrets at rest: integrate OS keystore on agent; fallback AES-GCM file.
-- [ ] 15.4. TLS management: load certs via config; provide script to generate self-signed certs for dev.
-- [ ] Security acceptance tests: tamper signature -> server rejects; replay old batch -> server rejects if outside window; rotated key validation.
+- [x] 15.1. Implement server provisioning flow: Register RPC stores `agent_id` + `secret` in `agents` table with metadata (kid versioning support).
+- [x] 15.2. Key rotation endpoints and server logic to accept old keys during grace period.
+- [x] 15.3. Secrets at rest: integrate OS keystore on agent; fallback AES-GCM file.
+- [x] 15.4. TLS management: load certs via config; provide script to generate self-signed certs for dev.
+- [x] Security acceptance tests: tamper signature -> server rejects; replay old batch -> server rejects if outside window; rotated key validation.
 
 ---
 

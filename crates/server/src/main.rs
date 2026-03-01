@@ -3,6 +3,7 @@ use sentinel_server::config::ServerConfig;
 use sentinel_server::grpc::AgentServiceImpl;
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
+use sentinel_server::tls::TlsIdentity;
 
 use sentinel_common::proto::agent_service_server::AgentServiceServer;
 use tonic::transport::Server as TonicServer;
@@ -21,12 +22,24 @@ async fn main() {
     let idempotency = IdempotencyStore::new();
     let broker = InMemoryBroker::new();
 
+    let tls_identity = config.tls.as_ref().map(|tls_cfg| {
+        TlsIdentity::load(tls_cfg).expect("failed to load TLS certificates")
+    });
+
     let grpc_service = AgentServiceImpl::new(agents.clone(), idempotency, broker);
     let grpc_addr = config.grpc_addr;
 
+    let grpc_tls = tls_identity
+        .as_ref()
+        .map(|id| id.tonic_server_tls().expect("failed to build gRPC TLS config"));
+
     let grpc_handle = tokio::spawn(async move {
         tracing::info!(%grpc_addr, "gRPC server starting");
-        TonicServer::builder()
+        let mut builder = TonicServer::builder();
+        if let Some(tls) = grpc_tls {
+            builder = builder.tls_config(tls).expect("invalid gRPC TLS config");
+        }
+        builder
             .add_service(AgentServiceServer::new(grpc_service))
             .serve(grpc_addr)
             .await

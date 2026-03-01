@@ -1,5 +1,5 @@
 mod heartbeat;
-mod push_metrics;
+pub mod push_metrics;
 mod register;
 mod service;
 

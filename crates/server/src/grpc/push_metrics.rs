@@ -6,23 +6,58 @@ use crate::auth::verify_signature;
 use crate::broker::BrokerPublisher;
 use crate::store::{AgentStore, IdempotencyStore};
 
+const DEFAULT_GRACE_PERIOD_MS: i64 = 24 * 60 * 60 * 1000;
+const DEFAULT_REPLAY_WINDOW_MS: i64 = 5 * 60 * 1000;
+
 pub async fn handle_push_metrics(
     agents: &AgentStore,
     idempotency: &IdempotencyStore,
     broker: &dyn BrokerPublisher,
     request: Request<Batch>,
 ) -> Result<Response<PushResponse>, Status> {
+    handle_push_metrics_with_config(
+        agents,
+        idempotency,
+        broker,
+        request,
+        DEFAULT_GRACE_PERIOD_MS,
+        DEFAULT_REPLAY_WINDOW_MS,
+    )
+    .await
+}
+
+pub async fn handle_push_metrics_with_config(
+    agents: &AgentStore,
+    idempotency: &IdempotencyStore,
+    broker: &dyn BrokerPublisher,
+    request: Request<Batch>,
+    grace_period_ms: i64,
+    replay_window_ms: i64,
+) -> Result<Response<PushResponse>, Status> {
     let agent_id = extract_metadata(&request, "x-agent-id")?;
     let signature = extract_metadata(&request, "x-signature")?;
+    let key_id = extract_metadata_opt(&request, "x-key-id");
 
-    let agent = agents
-        .get(&agent_id)
-        .ok_or_else(|| Status::unauthenticated("unknown agent"))?;
+    if agents.get(&agent_id).is_none() {
+        return Err(Status::unauthenticated("unknown agent"));
+    }
+
+    let secret = agents
+        .find_key_secret(&agent_id, key_id.as_deref(), grace_period_ms)
+        .ok_or_else(|| Status::unauthenticated("unknown or expired key"))?;
 
     let batch = request.into_inner();
 
+    let now_ms = current_time_ms();
+    if replay_window_ms > 0 && batch.created_at_ms > 0 {
+        let age = (now_ms - batch.created_at_ms).abs();
+        if age > replay_window_ms {
+            return Err(Status::unauthenticated("batch timestamp outside replay window"));
+        }
+    }
+
     let canonical = sentinel_common::canonicalize::canonical_bytes(&batch);
-    if !verify_signature(&agent.secret, &canonical, &signature) {
+    if !verify_signature(&secret, &canonical, &signature) {
         return Err(Status::unauthenticated("invalid signature"));
     }
 
@@ -37,12 +72,10 @@ pub async fn handle_push_metrics(
         }));
     }
 
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64;
-
-    if let Err(e) = broker.publish(&batch, Some(&signature)).await {
+    if let Err(e) = broker
+        .publish(&batch, Some(&signature), key_id.as_deref())
+        .await
+    {
         tracing::error!(batch_id = %batch.batch_id, error = %e, "broker publish failed");
         return Ok(Response::new(PushResponse {
             status: PushStatus::Retry.into(),
@@ -65,6 +98,21 @@ fn extract_metadata(request: &Request<Batch>, key: &str) -> Result<String, Statu
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
         .ok_or_else(|| Status::unauthenticated(format!("missing {key} header")))
+}
+
+fn extract_metadata_opt(request: &Request<Batch>, key: &str) -> Option<String> {
+    request
+        .metadata()
+        .get(key)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+}
+
+fn current_time_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
 }
 
 #[cfg(test)]
@@ -90,6 +138,7 @@ mod tests {
             key_id: "key-1".into(),
             agent_version: "0.1.0".into(),
             registered_at_ms: 1000,
+            deprecated_keys: Vec::new(),
         });
         let idempotency = IdempotencyStore::new();
         let broker = InMemoryBroker::new();

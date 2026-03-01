@@ -40,6 +40,7 @@ mod tests {
             key_id: "key-1".into(),
             agent_version: "0.1.0".into(),
             registered_at_ms: 1000,
+            deprecated_keys: Vec::new(),
         });
         store
     }

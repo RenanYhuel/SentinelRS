@@ -1,6 +1,9 @@
 use super::agent_record::AgentRecord;
+use super::deprecated_key::DeprecatedKey;
 use dashmap::DashMap;
 use std::sync::Arc;
+
+use sentinel_common::crypto::generate_secret;
 
 #[derive(Clone)]
 pub struct AgentStore {
@@ -38,6 +41,64 @@ impl AgentStore {
     pub fn count(&self) -> usize {
         self.agents.len()
     }
+
+    pub fn rotate_key(&self, agent_id: &str) -> Option<(String, Vec<u8>)> {
+        let mut entry = self.agents.get_mut(agent_id)?;
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+
+        let old = DeprecatedKey {
+            key_id: entry.key_id.clone(),
+            secret: entry.secret.clone(),
+            deprecated_at_ms: now_ms,
+        };
+        entry.deprecated_keys.push(old);
+
+        let new_secret = generate_secret();
+        let new_key_id = format!("key-{}", uuid::Uuid::new_v4());
+        entry.secret = new_secret.clone();
+        entry.key_id = new_key_id.clone();
+        Some((new_key_id, new_secret))
+    }
+
+    pub fn find_key_secret(
+        &self,
+        agent_id: &str,
+        key_id: Option<&str>,
+        grace_period_ms: i64,
+    ) -> Option<Vec<u8>> {
+        let record = self.agents.get(agent_id)?;
+
+        match key_id {
+            Some(kid) if kid == record.key_id => Some(record.secret.clone()),
+            Some(kid) => {
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as i64;
+                record
+                    .deprecated_keys
+                    .iter()
+                    .find(|dk| dk.key_id == kid && (now_ms - dk.deprecated_at_ms) < grace_period_ms)
+                    .map(|dk| dk.secret.clone())
+            }
+            None => Some(record.secret.clone()),
+        }
+    }
+
+    pub fn purge_expired_keys(&self, grace_period_ms: i64) {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        for mut entry in self.agents.iter_mut() {
+            entry
+                .deprecated_keys
+                .retain(|dk| (now_ms - dk.deprecated_at_ms) < grace_period_ms);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -52,6 +113,7 @@ mod tests {
             key_id: "key-1".into(),
             agent_version: "0.1.0".into(),
             registered_at_ms: 1000,
+            deprecated_keys: Vec::new(),
         }
     }
 

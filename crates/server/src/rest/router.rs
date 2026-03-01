@@ -2,7 +2,7 @@ use axum::Router;
 use axum::routing::{get, post};
 
 use crate::store::{AgentStore, RuleStore};
-use super::{agents, health, notifiers, rules};
+use super::{agents, health, key_rotation, notifiers, rules};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -17,6 +17,10 @@ pub fn router(state: AppState) -> Router {
         .route("/ready", get(health::ready))
         .route("/v1/agents", get(agents::list_agents))
         .route("/v1/agents/:agent_id", get(agents::get_agent))
+        .route(
+            "/v1/agents/:agent_id/rotate-key",
+            post(key_rotation::rotate_key),
+        )
         .route("/v1/rules", get(rules::list_rules).post(rules::create_rule))
         .route(
             "/v1/rules/:rule_id",

@@ -155,7 +155,10 @@ async fn push_metrics_publishes_to_broker() {
         batch_id: "batch-grpc-001".into(),
         seq_start: 0,
         seq_end: 3,
-        created_at_ms: 1_700_000_000_000,
+        created_at_ms: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64,
         metrics: sample_metrics(3),
         meta: Default::default(),
     };
@@ -172,7 +175,7 @@ async fn push_metrics_publishes_to_broker() {
         .insert("x-signature", signature.parse().unwrap());
     request
         .metadata_mut()
-        .insert("x-key-id", "default".parse().unwrap());
+        .insert("x-key-id", agent.key_id.parse().unwrap());
 
     let resp = client.push_metrics(request).await.unwrap().into_inner();
     assert_eq!(resp.status, 0);
@@ -200,7 +203,10 @@ async fn push_duplicate_batch_deduped() {
         batch_id: "batch-dup-001".into(),
         seq_start: 0,
         seq_end: 1,
-        created_at_ms: 1_700_000_000_000,
+        created_at_ms: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64,
         metrics: sample_metrics(1),
         meta: Default::default(),
     };
@@ -218,7 +224,7 @@ async fn push_duplicate_batch_deduped() {
             .insert("x-signature", signature.parse().unwrap());
         request
             .metadata_mut()
-            .insert("x-key-id", "default".parse().unwrap());
+            .insert("x-key-id", agent.key_id.parse().unwrap());
 
         let resp = client.push_metrics(request).await.unwrap().into_inner();
         assert_eq!(resp.status, 0);

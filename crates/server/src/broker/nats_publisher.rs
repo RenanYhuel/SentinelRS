@@ -17,7 +17,12 @@ impl NatsPublisher {
 
 #[tonic::async_trait]
 impl BrokerPublisher for NatsPublisher {
-    async fn publish(&self, batch: &Batch, signature: Option<&str>) -> Result<(), BrokerError> {
+    async fn publish(
+        &self,
+        batch: &Batch,
+        signature: Option<&str>,
+        key_id: Option<&str>,
+    ) -> Result<(), BrokerError> {
         let subject = subject_for_agent(&batch.agent_id);
         let payload = batch.encode_to_vec();
 
@@ -27,6 +32,10 @@ impl BrokerPublisher for NatsPublisher {
 
         if let Some(sig) = signature {
             headers.insert("X-Signature", sig);
+        }
+
+        if let Some(kid) = key_id {
+            headers.insert("X-Key-Id", kid);
         }
 
         let now_ms = std::time::SystemTime::now()
