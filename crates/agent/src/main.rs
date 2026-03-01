@@ -1,6 +1,7 @@
 mod batch;
 mod buffer;
 mod collector;
+mod exporter;
 mod scheduler;
 mod security;
 

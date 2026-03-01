@@ -14,9 +14,11 @@ prost = "0.13"
 uuid = { version = "1", features = ["v4"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tonic = "0.12"
 
 [build-dependencies]
 prost-build = "0.13"
+tonic-build = "0.12"
 
 [dev-dependencies]
 prost = "0.13"
