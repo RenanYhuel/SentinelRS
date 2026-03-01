@@ -1,8 +1,6 @@
 syntax = "proto3";
 package sentinel.common;
 
-reserved 9000 to 9999;
-
 enum MetricType {
   METRIC_TYPE_UNSPECIFIED = 0;
   GAUGE = 1;
@@ -74,5 +72,5 @@ service AgentService {
   rpc PushMetrics(Batch) returns (PushResponse);
 
   // Envoie un heartbeat.
-  rpc Heartbeat(Heartbeat) returns (PushResponse);
+  rpc SendHeartbeat(Heartbeat) returns (PushResponse);
 }
