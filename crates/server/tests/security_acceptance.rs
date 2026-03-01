@@ -52,6 +52,7 @@ fn seed(secret: &[u8], key_id: &str) -> (AgentStore, IdempotencyStore, InMemoryB
         agent_version: "0.1.0".into(),
         registered_at_ms: 1000,
         deprecated_keys: Vec::new(),
+        last_seen: None,
     });
     (agents, IdempotencyStore::new(), InMemoryBroker::new())
 }

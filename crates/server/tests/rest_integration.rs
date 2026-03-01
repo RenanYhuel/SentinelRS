@@ -12,6 +12,7 @@ fn app_state() -> AppState {
         rules: RuleStore::new(),
         jwt_secret: b"test-secret".to_vec(),
         metrics: ServerMetrics::new(),
+        pool: None,
     }
 }
 
@@ -28,6 +29,7 @@ fn seed_agent(state: &AppState) {
         agent_version: "0.1.0".into(),
         registered_at_ms: 1_700_000_000_000,
         deprecated_keys: Vec::new(),
+        last_seen: None,
     });
 }
 

@@ -45,6 +45,7 @@ pub async fn handle_register(
         agent_version: req.agent_version,
         registered_at_ms: now_ms,
         deprecated_keys: Vec::new(),
+        last_seen: None,
     };
 
     store.insert(record.clone());
