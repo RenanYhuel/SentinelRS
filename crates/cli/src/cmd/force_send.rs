@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use clap::Args;
 use std::path::PathBuf;
 
-use super::helpers;
 use crate::output::{confirm, print_json, progress, spinner, theme, OutputMode};
 use sentinel_agent::batch::BatchComposer;
 use sentinel_agent::buffer::Wal;
@@ -11,19 +10,19 @@ use sentinel_common::proto::push_response::Status;
 
 #[derive(Args)]
 pub struct ForceSendArgs {
-    #[arg(long, help = "Max batches to send (0 = all)")]
-    limit: Option<usize>,
-    #[arg(long, help = "Skip confirmation prompt")]
+    #[arg(long, default_value = "0")]
+    limit: usize,
+    #[arg(long, short)]
     yes: bool,
 }
 
-pub async fn execute(
+pub async fn run(
     args: ForceSendArgs,
     mode: OutputMode,
     server: Option<String>,
     config_path: Option<String>,
 ) -> Result<()> {
-    let cfg = helpers::load_config(config_path.as_deref())?;
+    let cfg = crate::cmd::wal::helpers::load_agent_config(config_path.as_deref())?;
     let endpoint = server.as_deref().unwrap_or(&cfg.server);
     let dir = PathBuf::from(&cfg.buffer.wal_dir);
     let mut wal = Wal::open(&dir, false, cfg.buffer.segment_size_mb * 1024 * 1024)?;
@@ -37,9 +36,8 @@ pub async fn execute(
         return Ok(());
     }
 
-    let limit = args.limit.unwrap_or(0);
-    let to_send: Vec<_> = if limit > 0 {
-        entries.into_iter().take(limit).collect()
+    let to_send: Vec<_> = if args.limit > 0 {
+        entries.into_iter().take(args.limit).collect()
     } else {
         entries
     };

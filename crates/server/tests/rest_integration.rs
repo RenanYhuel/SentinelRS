@@ -3,8 +3,10 @@ use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
 
 use sentinel_server::metrics::server_metrics::ServerMetrics;
+use sentinel_server::provisioning::TokenStore;
 use sentinel_server::rest::{router, AppState};
 use sentinel_server::store::{AgentRecord, AgentStore, RuleStore};
+use sentinel_server::stream::{PresenceEventBus, SessionRegistry};
 
 fn app_state() -> AppState {
     AppState {
@@ -13,6 +15,10 @@ fn app_state() -> AppState {
         jwt_secret: b"test-secret".to_vec(),
         metrics: ServerMetrics::new(),
         pool: None,
+        token_store: Some(TokenStore::new()),
+        grpc_public_url: "http://localhost:50051".into(),
+        registry: SessionRegistry::new(),
+        events: PresenceEventBus::new(),
     }
 }
 

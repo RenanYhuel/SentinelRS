@@ -7,48 +7,42 @@ const LOGO: &[&str] = &[
     r"   ╚════██║██╔══╝  ██║╚██╗██║   ██║   ██║██║╚██╗██║██╔══╝  ██║     ",
     r"   ███████║███████╗██║ ╚████║   ██║   ██║██║ ╚████║███████╗███████╗",
     r"   ╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝",
-    r"         ░░ Remote System Surveillance & Telemetry Engine ░░       ",
 ];
 
+const TAGLINE: &str = "Remote System Surveillance & Telemetry Engine";
+
 pub fn print_banner() {
-    let colors = [
-        colored::Color::Cyan,
+    let palette = [
+        colored::Color::BrightCyan,
         colored::Color::Cyan,
         colored::Color::BrightCyan,
         colored::Color::BrightWhite,
         colored::Color::Cyan,
-        colored::Color::Cyan,
+        colored::Color::BrightCyan,
     ];
 
-    for (line, &color) in LOGO.iter().zip(colors.iter()) {
+    println!();
+    for (i, line) in LOGO.iter().enumerate() {
+        let color = palette[i % palette.len()];
         println!("{}", line.color(color).bold());
     }
+    println!("         {}", format!("░░ {TAGLINE} ░░").dimmed());
+    println!();
 }
 
 pub fn print_version_block(version: &str) {
     print_banner();
+    let pairs = [
+        ("Version", version.to_string()),
+        ("Arch", std::env::consts::ARCH.to_string()),
+        ("OS", std::env::consts::OS.to_string()),
+    ];
+    for (label, value) in &pairs {
+        println!(
+            "  {} {}",
+            format!("{label:>8}").dimmed(),
+            value.bright_cyan().bold()
+        );
+    }
     println!();
-    println!("  {} {}", "Version".dimmed(), version.bright_cyan().bold());
-    println!(
-        "  {} {}",
-        "Runtime".dimmed(),
-        format!("Rust {}", rustc_version()).bright_white()
-    );
-    println!(
-        "  {} {}",
-        "  Arch ".dimmed(),
-        std::env::consts::ARCH.bright_white()
-    );
-    println!(
-        "  {} {}",
-        "    OS ".dimmed(),
-        std::env::consts::OS.bright_white()
-    );
-    println!();
-}
-
-fn rustc_version() -> &'static str {
-    option_env!("RUSTC_VERSION")
-        .or(option_env!("CARGO_PKG_RUST_VERSION"))
-        .unwrap_or("stable")
 }

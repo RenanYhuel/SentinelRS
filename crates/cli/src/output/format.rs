@@ -20,6 +20,10 @@ pub fn print_error(msg: &str) {
     eprintln!("{} {}", "✗".red().bold(), msg);
 }
 
+pub fn print_warning(msg: &str) {
+    println!("{} {}", "⚠".yellow().bold(), msg.yellow());
+}
+
 pub fn print_info(label: &str, value: &str) {
     println!("  {}: {}", label.bold(), value);
 }

@@ -1,22 +1,17 @@
 use anyhow::Result;
-use clap::Args;
 use std::path::PathBuf;
 
-use super::helpers;
+use crate::client;
 use crate::output::{print_json, spinner, theme, OutputMode};
 use sentinel_agent::buffer::{compute_stats, Wal};
 
-#[derive(Args)]
-pub struct StatusArgs;
-
-pub async fn execute(
-    _args: StatusArgs,
+pub async fn run(
     mode: OutputMode,
     server: Option<String>,
     config_path: Option<String>,
 ) -> Result<()> {
-    let cfg = helpers::load_config(config_path.as_deref()).ok();
-    let rest_base = helpers::resolve_rest_url(server.as_deref(), config_path.as_deref()).ok();
+    let cfg = crate::cmd::wal::helpers::load_agent_config(config_path.as_deref()).ok();
+    let api = client::build_client(server.as_deref()).ok();
 
     if mode == OutputMode::Human {
         theme::print_header("SentinelRS Status");
@@ -27,8 +22,8 @@ pub async fn execute(
         OutputMode::Json => None,
     };
 
-    let server_up = match &rest_base {
-        Some(url) => reqwest::get(&format!("{url}/healthz")).await.is_ok(),
+    let server_up = match &api {
+        Some(a) => a.health_ok().await,
         None => false,
     };
 
