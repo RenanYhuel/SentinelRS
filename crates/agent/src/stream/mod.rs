@@ -4,6 +4,7 @@ pub mod heartbeat;
 mod receiver;
 mod reconnect;
 mod sender;
+mod wal_drain;
 
 pub use connection::StreamClient;
 pub use reconnect::ReconnectPolicy;
