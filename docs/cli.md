@@ -1,8 +1,8 @@
 # CLI Reference
 
-The `sentinel` CLI provides administrative control over agents, alert rules, WAL inspection, key management and more.
+The `sentinel` CLI provides full administrative control over the SentinelRS platform: cluster monitoring, agent provisioning, alert rules, WAL inspection, key management and more.
 
-## Global Options
+## Global options
 
 | Flag              | Description                                     |
 | ----------------- | ----------------------------------------------- |
@@ -12,127 +12,41 @@ The `sentinel` CLI provides administrative control over agents, alert rules, WAL
 
 ## Commands
 
-### register
+### init
 
-Register a new agent with the server.
-
-```bash
-sentinel register --hw-id <HARDWARE_ID> [--agent-version <VERSION>] [--save]
-```
-
-| Argument          | Required | Description                                                  |
-| ----------------- | -------- | ------------------------------------------------------------ |
-| `--hw-id`         | Yes      | Unique hardware identifier for this host                     |
-| `--agent-version` | No       | Agent version string (defaults to crate version)             |
-| `--save`          | No       | Persist credentials to `~/.config/sentinel/credentials.json` |
-
-Returns an `agent_id` and `secret` from the server via gRPC.
-
----
-
-### config
-
-Manage agent configuration.
-
-#### config show
-
-Display the full resolved agent configuration.
+Interactive setup wizard. Configures the CLI's server URL and stores it in `~/.config/sentinel/config.json`.
 
 ```bash
-sentinel config show
-```
-
-#### config validate
-
-Validate a YAML config file.
-
-```bash
-sentinel config validate
-```
-
-Returns `{valid: true}` or a validation error with details.
-
-#### config path
-
-Print the resolved config file path.
-
-```bash
-sentinel config path
+sentinel init
 ```
 
 ---
 
-### wal
+### doctor
 
-Inspect and manage the agent's Write-Ahead Log.
-
-#### wal stats
-
-Show WAL summary: total size, segment count, unacked entries.
+Run system diagnostics: checks server reachability, NATS connectivity and database health.
 
 ```bash
-sentinel wal stats
-```
-
-#### wal inspect
-
-List unacked WAL entries.
-
-```bash
-sentinel wal inspect [--limit <N>]
-```
-
-| Argument  | Default | Description                |
-| --------- | ------- | -------------------------- |
-| `--limit` | 20      | Maximum entries to display |
-
-Each entry shows: record ID, size in bytes, batch ID, metrics count.
-
-#### wal compact
-
-Compact the WAL by removing acknowledged records.
-
-```bash
-sentinel wal compact [--force] [--yes]
-```
-
-| Argument  | Description                         |
-| --------- | ----------------------------------- |
-| `--force` | Skip the 64 MB size threshold check |
-| `--yes`   | Skip confirmation prompt            |
-
-Rewrites segment files into a single compacted segment, removing all acked records.
-
-#### wal meta
-
-Show WAL metadata: head/tail sequence numbers, last segment index, acked count.
-
-```bash
-sentinel wal meta
+sentinel doctor
 ```
 
 ---
 
-### force-send
+### completions
 
-Manually push unacked WAL entries to the server.
+Generate shell completions.
 
 ```bash
-sentinel force-send [--limit <N>] [--yes]
+sentinel completions <SHELL>
 ```
 
-| Argument  | Default | Description              |
-| --------- | ------- | ------------------------ |
-| `--limit` | 0 (all) | Maximum batches to send  |
-| `--yes`   | —       | Skip confirmation prompt |
-
-Reads unacked WAL entries, pushes each via gRPC, and acks on success. Displays sent/failed/total counts.
+Supported shells: `bash`, `zsh`, `fish`, `powershell`, `elvish`.
 
 ---
 
 ### agents
 
-Query registered agents via the REST API.
+Manage registered agents.
 
 #### agents list
 
@@ -140,7 +54,7 @@ Query registered agents via the REST API.
 sentinel agents list
 ```
 
-Displays a table: Agent ID, HW ID, Version, Last Seen.
+Displays: Agent ID, HW ID, Version, Last Seen.
 
 #### agents get
 
@@ -148,11 +62,105 @@ Displays a table: Agent ID, HW ID, Version, Last Seen.
 sentinel agents get <AGENT_ID>
 ```
 
+Detailed view of a single agent: ID, hardware ID, version, registration time, last seen, connection status.
+
+#### agents live
+
+Watch an agent's metrics in real-time via SSE streaming.
+
+```bash
+sentinel agents live <AGENT_ID> [--interval <SECONDS>]
+```
+
+| Argument     | Default | Description                 |
+| ------------ | ------- | --------------------------- |
+| `--interval` | 2       | Refresh interval in seconds |
+
+Displays a live-updating dashboard with CPU, memory, disk and network metrics.
+
+#### agents delete
+
+```bash
+sentinel agents delete <AGENT_ID> [--yes]
+```
+
+Remove an agent from the registry. Prompts for confirmation unless `--yes` is passed.
+
+#### agents generate-install
+
+Generate a one-liner install command with a bootstrap token for zero-touch provisioning.
+
+```bash
+sentinel agents generate-install [--server <URL>]
+```
+
+Returns a command you can copy-paste on a target host to automatically provision and start an agent. See [provisioning.md](provisioning.md) for details.
+
+---
+
+### cluster
+
+Cluster status and monitoring.
+
+#### cluster status
+
+```bash
+sentinel cluster status
+```
+
+Shows cluster overview: connected agents count, total registered agents, server uptime, NATS stream stats.
+
+#### cluster agents
+
+```bash
+sentinel cluster agents
+```
+
+Lists currently connected agents in the cluster with their session info, latency and uptime.
+
+#### cluster watch
+
+```bash
+sentinel cluster watch
+```
+
+Streams real-time cluster events via SSE: agent connections, disconnections, presence changes. Press `Ctrl+C` to stop.
+
+---
+
+### config
+
+Manage CLI and agent configuration.
+
+#### config show
+
+```bash
+sentinel config show
+```
+
+Display the full resolved agent configuration.
+
+#### config validate
+
+```bash
+sentinel config validate
+```
+
+Validate a YAML config file. Returns `{valid: true}` or a validation error.
+
+#### config path
+
+```bash
+sentinel config path
+```
+
+Print the resolved config file path.
+
 ---
 
 ### rules
 
-Manage alert rules via the REST API.
+Alert rule management via the REST API.
 
 #### rules list
 
@@ -174,7 +182,7 @@ sentinel rules get <RULE_ID>
 sentinel rules create --data <JSON>
 ```
 
-`--data` accepts inline JSON or a file path. Example:
+Example:
 
 ```json
 {
@@ -225,21 +233,17 @@ In human mode, `--type` shows an interactive fuzzy-select picker.
 
 ### key
 
-Manage agent encryption keys.
+Agent encryption key management.
 
 #### key rotate
-
-Store a new key in the encrypted file key store.
 
 ```bash
 sentinel key rotate --key-id <ID> --secret <BASE64_SECRET>
 ```
 
-Requires the `SENTINEL_MASTER_KEY` environment variable for AES-256-GCM encryption.
+Requires `SENTINEL_MASTER_KEY` environment variable for AES-256-GCM encryption.
 
 #### key list
-
-List all stored encrypted key files.
 
 ```bash
 sentinel key list
@@ -253,27 +257,107 @@ sentinel key delete <KEY_ID> [--yes]
 
 ---
 
-### health
+### wal
 
-Check server health.
+WAL inspection and maintenance (reads from local agent data).
+
+#### wal stats
+
+```bash
+sentinel wal stats
+```
+
+Summary: total size, segment count, unacked entries.
+
+#### wal inspect
+
+```bash
+sentinel wal inspect [--limit <N>]
+```
+
+List unacked WAL entries with record ID, size, batch ID and metrics count.
+
+#### wal compact
+
+```bash
+sentinel wal compact [--force] [--yes]
+```
+
+| Argument  | Description                         |
+| --------- | ----------------------------------- |
+| `--force` | Skip the 64 MB size threshold check |
+| `--yes`   | Skip confirmation prompt            |
+
+Rewrites segment files into a single compacted segment, removing all acked records.
+
+#### wal meta
+
+```bash
+sentinel wal meta
+```
+
+Show head/tail sequence numbers, last segment index, acked count.
+
+---
+
+### metrics
+
+Server metrics visualization.
+
+```bash
+sentinel metrics <SUBCOMMAND>
+```
+
+---
+
+### health
 
 ```bash
 sentinel health
 ```
 
-Queries `/healthz` and `/ready` endpoints.
+Query `/healthz` and `/ready` on the server.
 
 ---
 
 ### status
 
-Combined status dashboard.
-
 ```bash
 sentinel status
 ```
 
-Checks server reachability, displays agent ID, WAL stats (segments and unacked count).
+Combined dashboard: server reachability, agent ID, WAL stats.
+
+---
+
+### register
+
+Register a new agent via gRPC.
+
+```bash
+sentinel register --hw-id <HARDWARE_ID> [--agent-version <VERSION>] [--save]
+```
+
+Returns `agent_id` and `secret`. Use `--save` to persist credentials to `~/.config/sentinel/credentials.json`.
+
+For zero-touch provisioning, prefer `agents generate-install`.
+
+---
+
+### force-send
+
+Manually push unacked WAL entries to the server.
+
+```bash
+sentinel force-send [--limit <N>] [--yes]
+```
+
+| Argument  | Default | Description              |
+| --------- | ------- | ------------------------ |
+| `--limit` | 0 (all) | Maximum batches to send  |
+| `--yes`   | —       | Skip confirmation prompt |
+
+Reads unacked WAL entries, pushes each via gRPC, and acks on success.
 
 ---
 
@@ -306,11 +390,11 @@ Color coding: red = error, yellow = warn, cyan = info, dim = debug.
 sentinel version
 ```
 
-Displays binary name, version, architecture and OS. Human mode renders a formatted banner.
+Displays binary name, version, architecture and OS.
 
-## Output Modes
+## Output modes
 
 All commands support two output modes:
 
-- **Human** (default) — Colored tables and formatted text via `comfy-table` and `colored`
-- **JSON** (`--json`) — Machine-readable JSON, suitable for piping to `jq` or automation scripts
+- **Human** (default) — colored tables and formatted text
+- **JSON** (`--json`) — machine-readable output for automation and piping to `jq`

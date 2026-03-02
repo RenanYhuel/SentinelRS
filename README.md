@@ -17,101 +17,87 @@ Built for **reliability** (append-only WAL), **safe extensibility** (sandboxed W
 ## Architecture
 
 ```
-Agent                          Server                      Workers
-┌──────────────┐  gRPC/TLS    ┌──────────────┐   NATS     ┌──────────────┐
-│ Collectors   │─────────────▶│ Auth (HMAC)  │──────────▶│ Consumer     │
-│ WASM Plugins │              │ Validation   │           │ Aggregator   │
-│ WAL buffer   │              │ REST API     │           │ Alert Engine │
-│ Batch+Sign   │              │ Rate Limit   │           │ Notifiers    │
-└──────────────┘              └──────────────┘           └──────┬───────┘
-                                                                │
-                                                         TimescaleDB
+Agent                              Server                         Workers
+┌──────────────────┐  gRPC bidi   ┌────────────────────┐  NATS   ┌──────────────┐
+│ Collectors       │◀═══════════▶│ Stream Service     │────────▶│ Consumer     │
+│ WASM Plugins     │  streaming   │ Presence Tracking  │         │ Aggregator   │
+│ WAL buffer       │              │ REST API           │         │ Alert Engine │
+│ Batch + Sign     │              │ Provisioning       │         │ Notifiers    │
+│ Bootstrap        │              │ Session Registry   │         └──────┬───────┘
+└──────────────────┘              └────────────────────┘                │
+                                                                TimescaleDB
 ```
 
 > Full architecture details: [docs/architecture.md](docs/architecture.md)
 
 ## Highlights
 
-- **gRPC + TLS/mTLS** between agents and server, with HMAC-SHA256 batch signing
+- **Bidirectional gRPC streaming** — persistent connection with handshake, heartbeats and server-push commands
+- **Zero-touch provisioning** — bootstrap tokens for automated agent registration
 - **Append-only WAL** on the agent — no data loss on network failure
+- **Real-time presence tracking** — live agent status with watchdog and SSE events
+- **Docker-first deployment** — full stack in one `docker compose up`
 - **WASM plugin runtime** (wasmtime) — extend collection with sandboxed user code
 - **NATS JetStream** for decoupled, at-least-once delivery to workers
-- **TimescaleDB** with hypertables, continuous aggregates and retention policies
+- **TimescaleDB** with hypertables, continuous aggregates and automatic migrations
 - **Alerting engine** with configurable rules, severity levels and multi-channel notifications (webhook, Slack, Discord, SMTP)
-- **Admin CLI** for registration, key rotation, WAL inspection, rule management and more
+- **Admin CLI** — cluster monitoring, live metrics, provisioning, rule management and more
 
 ## Workspace
 
-| Crate            | Role                                                                   |
-| ---------------- | ---------------------------------------------------------------------- |
-| `crates/common`  | Protobuf types, crypto helpers, NATS config                            |
-| `crates/agent`   | Agent binary — collectors, WAL, scheduler, gRPC exporter, WASM runtime |
-| `crates/server`  | Ingestion gateway — gRPC + REST API, HMAC validation, NATS publisher   |
-| `crates/workers` | JetStream consumers, DB writers, aggregator, alert engine, notifiers   |
-| `crates/cli`     | Admin CLI — register, keys, WAL, rules, agents, notifiers              |
+| Crate            | Role                                                                      |
+| ---------------- | ------------------------------------------------------------------------- |
+| `crates/common`  | Protobuf types (V1 + V2 streaming), crypto helpers, NATS config           |
+| `crates/agent`   | Agent binary — collectors, WAL, streaming client, bootstrap, WASM runtime |
+| `crates/server`  | Ingestion gateway — gRPC streaming + REST API, provisioning, presence     |
+| `crates/workers` | JetStream consumers, DB writers, aggregator, alert engine, notifiers      |
+| `crates/cli`     | Admin CLI — cluster, agents, provisioning, rules, WAL, keys               |
 
-## Quick Start
-
-### Prerequisites
-
-| Dependency              | Purpose                                       |
-| ----------------------- | --------------------------------------------- |
-| Rust stable             | Build toolchain                               |
-| `protoc`                | Protocol Buffers compiler (for `prost-build`) |
-| Docker & Docker Compose | Local NATS + TimescaleDB                      |
-
-### 1. Start infrastructure
+## Quick Start (Docker)
 
 ```bash
+# 1. Start the full stack (server, worker, TimescaleDB, NATS)
 docker compose -f deploy/docker-compose.yml up -d
+
+# 2. Configure the CLI
+sentinel init
+
+# 3. Generate an install command with a bootstrap token
+sentinel agents generate-install --server https://localhost:8080
+
+# 4. Deploy an agent (Docker)
+docker compose -f deploy/docker-compose.yml --profile agent up -d
+
+# 5. Verify
+sentinel agents list
+sentinel cluster status
 ```
 
-### 2. Build
+> Full quickstart guide: [docs/quickstart.md](docs/quickstart.md)
+
+### Building from source
 
 ```bash
+# Prerequisites: Rust stable, protoc, Docker
 cargo build --workspace --release
-```
-
-### 3. Generate dev TLS certificates
-
-```bash
-./scripts/gen-dev-certs.sh
-```
-
-### 4. Run
-
-```bash
-# Server (gRPC :50051 + REST :8080 by default)
-./target/release/sentinel_server
-
-# Server with custom ports
-./target/release/sentinel_server --grpc-port 9051 --rest-port 3000
-# or via env: GRPC_PORT=9051 REST_PORT=3000 ./target/release/sentinel_server
-
-# Workers (connects to NATS + TimescaleDB)
-NATS_URL=nats://127.0.0.1:4222 ./target/release/sentinel_workers
-
-# Agent
-./target/release/sentinel_agent --config config.example.yml
-```
-
-### 5. Register an agent
-
-```bash
-sentinel register --hw-id my-host-01 --save
 ```
 
 ## Documentation
 
-| Document                               | Description                                             |
-| -------------------------------------- | ------------------------------------------------------- |
-| [Architecture](docs/architecture.md)   | System design, data flow, crate responsibilities        |
-| [CLI Reference](docs/cli.md)           | All commands with usage examples                        |
-| [Configuration](docs/configuration.md) | Agent, server and worker settings                       |
-| [Deployment](docs/deployment.md)       | Docker Compose, production checklist, TLS setup         |
-| [Security](docs/security.md)           | HMAC signing, encryption, key rotation, WASM sandboxing |
-| [Development](docs/development.md)     | Building from source, tests, CI pipeline                |
-| [Contributing](CONTRIBUTING.md)        | How to contribute                                       |
+| Document                               | Description                                          |
+| -------------------------------------- | ---------------------------------------------------- |
+| [Quick Start](docs/quickstart.md)      | 5-minute Docker-first setup guide                    |
+| [Docker](docs/docker.md)               | Images, compose, scaling, production                 |
+| [Architecture](docs/architecture.md)   | System design, data flow, crate responsibilities     |
+| [Streaming](docs/streaming.md)         | gRPC V2 bidirectional protocol                       |
+| [Provisioning](docs/provisioning.md)   | Bootstrap tokens and zero-touch agent setup          |
+| [CLI Reference](docs/cli-v2.md)        | All V2 commands with usage examples                  |
+| [CLI (V1 legacy)](docs/cli.md)         | V1 command reference                                 |
+| [Configuration](docs/configuration.md) | Agent, server and worker settings                    |
+| [Deployment](docs/deployment.md)       | Docker strategy, production checklist, TLS setup     |
+| [Security](docs/security.md)           | HMAC signing, encryption, key rotation, WASM sandbox |
+| [Development](docs/development.md)     | Building from source, tests, CI pipeline             |
+| [Contributing](CONTRIBUTING.md)        | How to contribute                                    |
 
 ## CI
 
