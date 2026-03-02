@@ -1,0 +1,48 @@
+FROM rust:1.85-bookworm AS builder
+
+RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY Cargo.toml Cargo.toml
+COPY crates/common crates/common
+COPY crates/agent crates/agent
+COPY crates/cli crates/cli
+
+RUN mkdir -p crates/server/src crates/workers/src \
+    && echo "fn main() {}" > crates/server/src/main.rs \
+    && echo "" > crates/server/src/lib.rs \
+    && echo "fn main() {}" > crates/workers/src/main.rs \
+    && echo "" > crates/workers/src/lib.rs
+
+COPY crates/server/Cargo.toml crates/server/Cargo.toml
+COPY crates/workers/Cargo.toml crates/workers/Cargo.toml
+
+RUN cargo build --release --package sentinel_cli 2>/dev/null || true
+
+COPY crates/cli crates/cli
+
+RUN cargo build --release --package sentinel_cli
+
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r sentinel && useradd -r -g sentinel -s /sbin/nologin sentinel
+
+COPY --from=builder /build/target/release/sentinel_cli /usr/local/bin/sentinel_cli
+
+RUN chmod +x /usr/local/bin/sentinel_cli
+
+RUN mkdir -p /home/sentinel/.sentinel && chown -R sentinel:sentinel /home/sentinel
+
+USER sentinel
+
+LABEL org.opencontainers.image.title="SentinelRS CLI" \
+      org.opencontainers.image.description="SentinelRS administration CLI tool" \
+      org.opencontainers.image.vendor="SentinelRS" \
+      org.opencontainers.image.source="https://github.com/sentinelrs/sentinelrs"
+
+ENTRYPOINT ["sentinel_cli"]

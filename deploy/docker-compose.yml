@@ -1,28 +1,130 @@
-version: "3.8"
-
 services:
+    timescaledb:
+        image: timescale/timescaledb:latest-pg14
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER:-sentinel}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel_secret}
+            POSTGRES_DB: ${POSTGRES_DB:-sentinel}
+        ports:
+            - "5432:5432"
+        volumes:
+            - sentinel-db-data:/var/lib/postgresql/data
+        networks:
+            - sentinel-net
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "pg_isready -U ${POSTGRES_USER:-sentinel} -d ${POSTGRES_DB:-sentinel}",
+                ]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+
     nats:
-        image: nats:2.9.4
+        image: nats:2.10
         restart: unless-stopped
         command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
         ports:
             - "4222:4222"
             - "8222:8222"
         volumes:
-            - nats_data:/data
+            - sentinel-nats-data:/data
+        networks:
+            - sentinel-net
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "wget",
+                    "--spider",
+                    "-q",
+                    "http://localhost:8222/healthz",
+                ]
+            interval: 5s
+            timeout: 3s
+            retries: 10
 
-    timescaledb:
-        image: timescale/timescaledb:latest-pg14
+    sentinel-server:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile.server
+        image: sentinelrs/server:${SENTINEL_VERSION:-latest}
         restart: unless-stopped
+        depends_on:
+            timescaledb:
+                condition: service_healthy
+            nats:
+                condition: service_healthy
         environment:
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-            POSTGRES_DB: sentinel
+            DATABASE_URL: ${DATABASE_URL:-postgres://sentinel:sentinel_secret@timescaledb:5432/sentinel}
+            NATS_URL: ${NATS_URL:-nats://nats:4222}
+            SERVER_GRPC_PORT: ${SERVER_GRPC_PORT:-50051}
+            SERVER_REST_PORT: ${SERVER_REST_PORT:-8080}
+            RUST_LOG: ${SERVER_LOG_LEVEL:-info}
         ports:
-            - "5432:5432"
+            - "${SERVER_GRPC_PORT:-50051}:50051"
+            - "${SERVER_REST_PORT:-8080}:8080"
+        networks:
+            - sentinel-net
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 15s
+
+    sentinel-worker:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile.worker
+        image: sentinelrs/worker:${SENTINEL_VERSION:-latest}
+        restart: unless-stopped
+        depends_on:
+            sentinel-server:
+                condition: service_healthy
+        environment:
+            DATABASE_URL: ${DATABASE_URL:-postgres://sentinel:sentinel_secret@timescaledb:5432/sentinel}
+            NATS_URL: ${NATS_URL:-nats://nats:4222}
+            WORKER_CONSUMER_GROUP: ${WORKER_CONSUMER_GROUP:-sentinel-workers}
+            RUST_LOG: ${WORKER_LOG_LEVEL:-info}
+        networks:
+            - sentinel-net
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        deploy:
+            replicas: 1
+
+    sentinel-agent:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile.agent
+        image: sentinelrs/agent:${SENTINEL_VERSION:-latest}
+        restart: unless-stopped
+        depends_on:
+            sentinel-server:
+                condition: service_healthy
+        environment:
+            SERVER_URL: ${SERVER_URL:-http://sentinel-server:50051}
+            RUST_LOG: ${AGENT_LOG_LEVEL:-info}
+            AGENT_COLLECT_INTERVAL: ${AGENT_COLLECT_INTERVAL:-10}
         volumes:
-            - timescale_data:/var/lib/postgresql/data
+            - sentinel-agent-config:/etc/sentinel
+        networks:
+            - sentinel-net
+        profiles:
+            - agent
 
 volumes:
-    timescale_data:
-    nats_data:
+    sentinel-db-data:
+    sentinel-nats-data:
+    sentinel-agent-config:
+
+networks:
+    sentinel-net:
+        driver: bridge

@@ -4,7 +4,8 @@ use sentinel_server::broker::{connect_jetstream, ensure_stream, NatsPublisher};
 use sentinel_server::config::ServerConfig;
 use sentinel_server::grpc::AgentServiceImpl;
 use sentinel_server::metrics::server_metrics::ServerMetrics;
-use sentinel_server::persistence::{create_pool, AgentRepo};
+use sentinel_server::migration;
+use sentinel_server::persistence::AgentRepo;
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
 use sentinel_server::tls::TlsIdentity;
@@ -22,7 +23,40 @@ async fn main() {
         .json()
         .init();
 
+    tracing::info!("SentinelRS Server v{} starting", env!("CARGO_PKG_VERSION"));
+
     let config = ServerConfig::from_env_and_args();
+
+    let (pool, agent_repo) = match config.database_url {
+        Some(ref url) => {
+            tracing::info!("waiting for database...");
+
+            let health_config = migration::HealthConfig::default();
+            let pool = migration::wait_for_db(url, 10, &health_config)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::error!(error = %e, "database health check failed");
+                    std::process::exit(1);
+                });
+            tracing::info!("database connection established");
+
+            match migration::run(&pool).await {
+                Ok(0) => tracing::info!("database schema up to date"),
+                Ok(n) => tracing::info!(count = n, "auto-migration completed successfully"),
+                Err(e) => {
+                    tracing::error!(error = %e, "auto-migration failed");
+                    std::process::exit(1);
+                }
+            }
+
+            let repo = Arc::new(AgentRepo::new(pool.clone()));
+            (Some(pool), Some(repo))
+        }
+        None => {
+            tracing::warn!("no DATABASE_URL configured, agent store is in-memory only");
+            (None, None)
+        }
+    };
 
     let js = connect_jetstream(&config.nats_url)
         .await
@@ -40,27 +74,12 @@ async fn main() {
     let broker = NatsPublisher::new(js);
     let server_metrics = ServerMetrics::new();
 
-    let agent_repo = match config.database_url {
-        Some(ref url) => {
-            let pool = create_pool(url, 10)
-                .await
-                .expect("failed to connect to PostgreSQL");
-            tracing::info!("connected to PostgreSQL");
-
-            let repo = Arc::new(AgentRepo::new(pool));
-            match repo.load_all(&agents).await {
-                Ok(n) => tracing::info!(count = n, "loaded agents from database"),
-                Err(e) => tracing::error!(error = %e, "failed to load agents from database"),
-            }
-            Some(repo)
+    if let Some(ref repo) = agent_repo {
+        match repo.load_all(&agents).await {
+            Ok(n) => tracing::info!(count = n, "loaded agents from database"),
+            Err(e) => tracing::error!(error = %e, "failed to load agents from database"),
         }
-        None => {
-            tracing::warn!("no DATABASE_URL configured, agent store is in-memory only");
-            None
-        }
-    };
-
-    let db_pool = agent_repo.as_ref().map(|r| r.pool().clone());
+    }
 
     let tls_identity = config
         .tls
@@ -82,7 +101,7 @@ async fn main() {
     });
 
     let grpc_handle = tokio::spawn(async move {
-        tracing::info!(%grpc_addr, "gRPC server starting");
+        tracing::info!(%grpc_addr, "gRPC listening");
         let mut builder = TonicServer::builder();
         if let Some(tls) = grpc_tls {
             builder = builder.tls_config(tls).expect("invalid gRPC TLS config");
@@ -99,13 +118,13 @@ async fn main() {
         rules: RuleStore::new(),
         jwt_secret: config.jwt_secret,
         metrics: server_metrics,
-        pool: db_pool,
+        pool,
     };
     let rest_app = rest::router(app_state);
     let rest_addr = config.rest_addr;
 
     let rest_handle = tokio::spawn(async move {
-        tracing::info!(%rest_addr, "REST server starting");
+        tracing::info!(%rest_addr, "REST listening");
         let listener = tokio::net::TcpListener::bind(rest_addr).await.unwrap();
         axum::serve(listener, rest_app).await.unwrap();
     });

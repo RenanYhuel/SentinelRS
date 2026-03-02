@@ -1,0 +1,52 @@
+FROM rust:1.85-bookworm AS builder
+
+RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY Cargo.toml Cargo.toml
+COPY crates/common crates/common
+COPY crates/server crates/server
+
+RUN mkdir -p crates/agent/src crates/workers/src crates/cli/src \
+    && echo "fn main() {}" > crates/agent/src/main.rs \
+    && echo "" > crates/agent/src/lib.rs \
+    && echo "fn main() {}" > crates/workers/src/main.rs \
+    && echo "" > crates/workers/src/lib.rs \
+    && echo "fn main() {}" > crates/cli/src/main.rs
+
+COPY crates/agent/Cargo.toml crates/agent/Cargo.toml
+COPY crates/workers/Cargo.toml crates/workers/Cargo.toml
+COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
+
+RUN cargo build --release --package sentinel_server 2>/dev/null || true
+
+COPY crates/server crates/server
+
+RUN cargo build --release --package sentinel_server
+
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r sentinel && useradd -r -g sentinel -s /sbin/nologin sentinel
+
+COPY --from=builder /build/target/release/sentinel_server /usr/local/bin/sentinel_server
+
+RUN chmod +x /usr/local/bin/sentinel_server
+
+USER sentinel
+
+EXPOSE 50051 8080
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8080/healthz || exit 1
+
+LABEL org.opencontainers.image.title="SentinelRS Server" \
+      org.opencontainers.image.description="SentinelRS monitoring server — gRPC ingestion + REST API" \
+      org.opencontainers.image.vendor="SentinelRS" \
+      org.opencontainers.image.source="https://github.com/sentinelrs/sentinelrs"
+
+ENTRYPOINT ["sentinel_server"]

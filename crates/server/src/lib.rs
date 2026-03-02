@@ -4,6 +4,7 @@ pub mod config;
 pub mod grpc;
 pub mod metrics;
 pub mod middleware;
+pub mod migration;
 pub mod persistence;
 pub mod rest;
 pub mod store;
