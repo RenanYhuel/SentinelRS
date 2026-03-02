@@ -95,7 +95,7 @@ services:
         networks:
             - sentinel-net
         healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+            test: ["CMD", "curl", "-f", "http://localhost:9090/healthz"]
             interval: 10s
             timeout: 5s
             retries: 5

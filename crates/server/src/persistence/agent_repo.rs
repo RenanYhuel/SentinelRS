@@ -47,14 +47,15 @@ impl AgentRepo {
             .unwrap_or_else(|_| serde_json::Value::Array(vec![]));
 
         sqlx::query(
-            r#"INSERT INTO agents (agent_id, hw_id, secret, key_id, agent_version, registered_at_ms, deprecated_keys)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
+            r#"INSERT INTO agents (agent_id, hw_id, secret, key_id, agent_version, registered_at_ms, deprecated_keys, last_seen)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
                ON CONFLICT (agent_id) DO UPDATE SET
                  hw_id = EXCLUDED.hw_id,
                  secret = EXCLUDED.secret,
                  key_id = EXCLUDED.key_id,
                  agent_version = EXCLUDED.agent_version,
-                 deprecated_keys = EXCLUDED.deprecated_keys"#,
+                 deprecated_keys = EXCLUDED.deprecated_keys,
+                 last_seen = NOW()"#,
         )
         .bind(&record.agent_id)
         .bind(&record.hw_id)

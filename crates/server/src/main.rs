@@ -121,6 +121,7 @@ async fn main() {
         session_registry.clone(),
         presence_events.clone(),
         config.key_grace_period_ms,
+        server_metrics.clone(),
     )
     .with_provisioning(
         token_store.clone(),

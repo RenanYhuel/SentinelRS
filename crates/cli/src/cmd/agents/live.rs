@@ -52,20 +52,24 @@ pub async fn run(args: LiveArgs, mode: OutputMode, server: Option<String>) -> Re
 
 fn render_snapshot(snap: &serde_json::Value) {
     let fields = [
-        "agent_id",
-        "agent_version",
-        "last_heartbeat",
-        "metrics_received",
-        "connected_since",
+        ("agent_id", "Agent ID"),
+        ("agent_version", "Version"),
+        ("last_ping", "Last Heartbeat"),
+        ("heartbeat_count", "Heartbeats"),
+        ("connected_at", "Connected Since"),
+        ("connection_quality", "Quality"),
+        ("memory_percent", "Memory %"),
     ];
-    for field in &fields {
-        if let Some(val) = snap.get(field) {
-            theme::print_kv(field, &val.to_string());
+    for (key, label) in &fields {
+        if let Some(val) = snap.get(key) {
+            theme::print_kv(label, &val.to_string());
         }
     }
     println!();
 }
 
 fn clear_previous_render() {
-    print!("\x1b[7A\x1b[J");
+    use std::io::Write;
+    print!("\x1b[8A\x1b[J");
+    std::io::stdout().flush().ok();
 }

@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use sentinel_common::proto::{
     agent_message::Payload as AgentPayload, server_message::Payload as ServerPayload, AgentMessage,
     ServerError, ServerMessage,
 };
 
 use crate::broker::BrokerPublisher;
+use crate::metrics::server_metrics::ServerMetrics;
 use crate::store::{AgentStore, IdempotencyStore};
 
 use super::heartbeat_handler::handle_heartbeat_ping;
@@ -22,6 +25,7 @@ pub async fn dispatch(
     registry: &SessionRegistry,
     events: &PresenceEventBus,
     grace_period_ms: i64,
+    metrics: &Arc<ServerMetrics>,
 ) -> Option<ServerMessage> {
     let payload = match msg.payload {
         Some(p) => p,
@@ -38,6 +42,7 @@ pub async fn dispatch(
                 idempotency,
                 broker,
                 grace_period_ms,
+                metrics,
             )
             .await;
             Some(response)
