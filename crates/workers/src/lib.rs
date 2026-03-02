@@ -1,11 +1,16 @@
 pub mod aggregator;
 pub mod alert;
 pub mod api;
+pub mod backpressure;
+pub mod config;
 pub mod consumer;
 pub mod dedup;
+pub mod identity;
 pub mod ingestion;
 pub mod metrics;
 pub mod notifier;
+pub mod registry;
+pub mod shutdown;
 pub mod storage;
 pub mod transform;
 pub mod verify;
