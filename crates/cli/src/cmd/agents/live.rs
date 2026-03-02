@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 use colored::Colorize;
+use crossterm::{cursor, execute, terminal};
 
 use crate::client;
 use crate::output::{print_json, theme, OutputMode};
@@ -36,40 +37,53 @@ pub async fn run(args: LiveArgs, mode: OutputMode, server: Option<String>) -> Re
     theme::divider();
 
     let interval = std::time::Duration::from_secs(args.interval);
+    let mut prev_lines: u16 = 0;
 
     loop {
-        match api.get_json(&format!("/v1/agents/{agent_id}/live")).await {
+        let lines = match api.get_json(&format!("/v1/agents/{agent_id}/live")).await {
             Ok(snap) => render_snapshot(&snap),
             Err(_) => {
                 println!("  {} agent not connected", "●".red());
+                println!();
+                2
             }
-        }
+        };
 
         tokio::time::sleep(interval).await;
-        clear_previous_render();
+
+        if prev_lines > 0 {
+            let mut stdout = std::io::stdout();
+            let _ = execute!(
+                stdout,
+                cursor::MoveUp(prev_lines),
+                terminal::Clear(terminal::ClearType::FromCursorDown)
+            );
+        }
+        prev_lines = lines as u16;
     }
 }
 
-fn render_snapshot(snap: &serde_json::Value) {
-    let fields = [
-        ("agent_id", "Agent ID"),
-        ("agent_version", "Version"),
-        ("last_ping", "Last Heartbeat"),
-        ("heartbeat_count", "Heartbeats"),
-        ("connected_at", "Connected Since"),
-        ("connection_quality", "Quality"),
-        ("memory_percent", "Memory %"),
-    ];
-    for (key, label) in &fields {
-        if let Some(val) = snap.get(key) {
-            theme::print_kv(label, &val.to_string());
-        }
+const FIELDS: &[(&str, &str)] = &[
+    ("agent_id", "Agent ID"),
+    ("agent_version", "Version"),
+    ("last_ping", "Last Heartbeat"),
+    ("heartbeat_count", "Heartbeats"),
+    ("connected_at", "Connected Since"),
+    ("connection_quality", "Quality"),
+    ("memory_percent", "Memory %"),
+];
+
+fn render_snapshot(snap: &serde_json::Value) -> usize {
+    let mut count = 0;
+    for (key, label) in FIELDS {
+        let display = match snap.get(key) {
+            Some(serde_json::Value::String(s)) => s.clone(),
+            Some(v) => v.to_string(),
+            None => "-".into(),
+        };
+        theme::print_kv(label, &display);
+        count += 1;
     }
     println!();
-}
-
-fn clear_previous_render() {
-    use std::io::Write;
-    print!("\x1b[8A\x1b[J");
-    std::io::stdout().flush().ok();
+    count + 1
 }

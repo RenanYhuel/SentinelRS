@@ -3,8 +3,11 @@ use axum::Router;
 use sqlx::PgPool;
 use std::sync::Arc;
 
-use super::{agents, cluster, health, key_rotation, metrics, notifiers, provisioning, rules};
+use super::{
+    agents, alerts, cluster, health, key_rotation, metrics, notifiers, provisioning, rules,
+};
 use crate::metrics::server_metrics::ServerMetrics;
+use crate::persistence::RuleRepo;
 use crate::provisioning::TokenStore;
 use crate::store::{AgentStore, RuleStore};
 use crate::stream::{PresenceEventBus, SessionRegistry};
@@ -13,6 +16,7 @@ use crate::stream::{PresenceEventBus, SessionRegistry};
 pub struct AppState {
     pub agents: AgentStore,
     pub rules: RuleStore,
+    pub rule_repo: Option<Arc<RuleRepo>>,
     pub jwt_secret: Vec<u8>,
     pub metrics: Arc<ServerMetrics>,
     pub pool: Option<PgPool>,
@@ -45,6 +49,8 @@ pub fn router(state: AppState) -> Router {
                 .put(rules::update_rule)
                 .delete(rules::delete_rule),
         )
+        .route("/v1/alerts", get(alerts::list_alerts))
+        .route("/v1/alerts/:alert_id", get(alerts::get_alert))
         .route("/v1/notifiers/test", post(notifiers::test_notifier))
         .route("/v1/cluster/status", get(cluster::cluster_status))
         .route("/v1/cluster/agents", get(cluster::agent_ids))

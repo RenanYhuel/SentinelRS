@@ -10,7 +10,7 @@ use sentinel_server::config::ServerConfig;
 use sentinel_server::grpc::AgentServiceImpl;
 use sentinel_server::metrics::server_metrics::ServerMetrics;
 use sentinel_server::migration;
-use sentinel_server::persistence::AgentRepo;
+use sentinel_server::persistence::{AgentRepo, RuleRepo};
 use sentinel_server::provisioning::TokenStore;
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
@@ -31,7 +31,7 @@ async fn main() {
 
     let config = ServerConfig::from_env_and_args();
 
-    let (pool, agent_repo) = match config.database_url {
+    let (pool, agent_repo, rule_repo) = match config.database_url {
         Some(ref url) => {
             let sw = logging::stopwatch();
             let health_config = migration::HealthConfig::default();
@@ -53,11 +53,12 @@ async fn main() {
             }
 
             let repo = Arc::new(AgentRepo::new(pool.clone()));
-            (Some(pool), Some(repo))
+            let r_repo = Arc::new(RuleRepo::new(pool.clone()));
+            (Some(pool), Some(repo), Some(r_repo))
         }
         None => {
             tracing::warn!(target: "db", "No DATABASE_URL — in-memory mode");
-            (None, None)
+            (None, None, None)
         }
     };
 
@@ -74,12 +75,20 @@ async fn main() {
     tracing::info!(target: "net", "Stream '{}' ready", stream_config.name);
 
     let agents = AgentStore::new();
+    let rules = RuleStore::new();
     let server_metrics = ServerMetrics::new();
 
     if let Some(ref repo) = agent_repo {
         match repo.load_all(&agents).await {
             Ok(n) => tracing::info!(target: "data", count = n, "Loaded agents from database"),
             Err(e) => tracing::error!(target: "data", error = %e, "Failed to load agents"),
+        }
+    }
+
+    if let Some(ref repo) = rule_repo {
+        match repo.load_all(&rules).await {
+            Ok(n) => tracing::info!(target: "data", count = n, "Loaded alert rules from database"),
+            Err(e) => tracing::error!(target: "data", error = %e, "Failed to load alert rules"),
         }
     }
 
@@ -151,7 +160,8 @@ async fn main() {
 
     let app_state = AppState {
         agents,
-        rules: RuleStore::new(),
+        rules,
+        rule_repo,
         jwt_secret: config.jwt_secret,
         metrics: server_metrics,
         pool,

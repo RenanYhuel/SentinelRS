@@ -1,4 +1,5 @@
 mod agents;
+mod alerts;
 mod cluster;
 mod completions;
 mod config;
@@ -35,6 +36,9 @@ pub enum Commands {
 
     #[command(subcommand, about = "Manage registered agents")]
     Agents(agents::AgentsCmd),
+
+    #[command(subcommand, about = "View and filter alerts")]
+    Alerts(alerts::AlertsCmd),
 
     #[command(subcommand, about = "Cluster status and monitoring")]
     Cluster(cluster::ClusterCmd),
@@ -80,6 +84,7 @@ pub async fn run(opts: crate::Opts) -> Result<()> {
         Commands::Doctor => doctor::execute(mode, opts.server).await,
         Commands::Completions { shell } => completions::execute(shell),
         Commands::Agents(cmd) => agents::execute(cmd, mode, opts.server).await,
+        Commands::Alerts(cmd) => alerts::execute(cmd, mode, opts.server).await,
         Commands::Cluster(cmd) => cluster::execute(cmd, mode, opts.server).await,
         Commands::Config(cmd) => config::execute(cmd, mode).await,
         Commands::Rules(cmd) => rules::execute(cmd, mode, opts.server).await,

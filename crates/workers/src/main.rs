@@ -11,7 +11,7 @@ use sentinel_workers::consumer::{
     connect_jetstream, create_group_consumer, ensure_stream, ConsumerLoop,
 };
 use sentinel_workers::identity::WorkerIdentity;
-use sentinel_workers::ingestion::IngestPipeline;
+use sentinel_workers::ingestion::{AlertEngine, IngestPipeline};
 use sentinel_workers::metrics::worker_metrics::WorkerMetrics;
 use sentinel_workers::registry::WorkerRegistry;
 use sentinel_workers::shutdown::spawn_signal_handler;
@@ -56,7 +56,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let semaphore = Arc::new(BatchSemaphore::new(
         config.backpressure.max_concurrent_batches,
     ));
-    let pipeline = Arc::new(IngestPipeline::new(pool, worker_metrics.clone()));
+
+    let alert_engine = match AlertEngine::new(pool.clone()).await {
+        Ok(engine) => {
+            let engine = Arc::new(engine);
+            engine.spawn_reload_loop(cancel.clone());
+            tracing::info!(target: "alert", "Alert engine active");
+            Some(engine)
+        }
+        Err(e) => {
+            tracing::warn!(target: "alert", error = %e, "Alert engine init failed, alerts disabled");
+            None
+        }
+    };
+
+    let pipeline = {
+        let p = IngestPipeline::new(pool, worker_metrics.clone());
+        match alert_engine {
+            Some(engine) => Arc::new(p.with_alert_engine(engine)),
+            None => Arc::new(p),
+        }
+    };
 
     let sw = logging::stopwatch();
     let (js, _client) = connect_jetstream(&config.nats_url).await?;
