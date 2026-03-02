@@ -23,7 +23,7 @@ services:
             retries: 10
 
     nats:
-        image: nats:2.10
+        image: nats:2.10-alpine
         restart: unless-stopped
         command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
         ports:
@@ -38,13 +38,15 @@ services:
                 [
                     "CMD",
                     "wget",
-                    "--spider",
                     "-q",
+                    "-O",
+                    "/dev/null",
                     "http://localhost:8222/healthz",
                 ]
             interval: 5s
-            timeout: 3s
-            retries: 10
+            timeout: 5s
+            retries: 15
+            start_period: 10s
 
     sentinel-server:
         build:
