@@ -12,6 +12,7 @@ pub struct TlsConfig {
 pub struct ServerConfig {
     pub grpc_addr: SocketAddr,
     pub rest_addr: SocketAddr,
+    pub grpc_advertise_addr: Option<String>,
     pub jwt_secret: Vec<u8>,
     pub nats_url: String,
     pub database_url: Option<String>,
@@ -26,6 +27,7 @@ impl Default for ServerConfig {
         Self {
             grpc_addr: "0.0.0.0:50051".parse().unwrap(),
             rest_addr: "0.0.0.0:8080".parse().unwrap(),
+            grpc_advertise_addr: None,
             jwt_secret: b"change-me-in-production".to_vec(),
             nats_url: "nats://127.0.0.1:4222".into(),
             database_url: None,
@@ -82,6 +84,10 @@ impl ServerConfig {
             config.database_url = Some(url.clone());
         } else if let Ok(val) = std::env::var("DATABASE_URL") {
             config.database_url = Some(val);
+        }
+
+        if let Ok(val) = std::env::var("SERVER_GRPC_ADVERTISE_ADDR") {
+            config.grpc_advertise_addr = Some(val);
         }
 
         config
@@ -204,5 +210,6 @@ fn print_help() {
     println!("  JWT_SECRET   JWT signing secret");
     println!("  NATS_URL     NATS server URL");
     println!("  DATABASE_URL PostgreSQL connection URL");
+    println!("  SERVER_GRPC_ADVERTISE_ADDR  Public gRPC URL sent to agents during bootstrap");
     println!("\nPrecedence: CLI flags > environment variables > defaults");
 }

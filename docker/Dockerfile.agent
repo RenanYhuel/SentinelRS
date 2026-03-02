@@ -37,11 +37,11 @@ COPY --from=builder /build/target/release/sentinel_agent /usr/local/bin/sentinel
 
 RUN chmod +x /usr/local/bin/sentinel_agent
 
-RUN mkdir -p /etc/sentinel && chown sentinel:sentinel /etc/sentinel
-
-USER sentinel
+RUN mkdir -p /etc/sentinel && chown -R sentinel:sentinel /etc/sentinel
 
 VOLUME ["/etc/sentinel"]
+
+USER sentinel
 
 EXPOSE 9090
 
