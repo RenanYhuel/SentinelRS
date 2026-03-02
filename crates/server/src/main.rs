@@ -8,10 +8,12 @@ use sentinel_server::migration;
 use sentinel_server::persistence::AgentRepo;
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
+use sentinel_server::stream::{SessionRegistry, StreamService};
 use sentinel_server::tls::TlsIdentity;
 
 use sentinel_common::nats_config::StreamConfig;
 use sentinel_common::proto::agent_service_server::AgentServiceServer;
+use sentinel_common::proto::sentinel_stream_server::SentinelStreamServer;
 use tonic::transport::Server as TonicServer;
 
 #[tokio::main]
@@ -70,8 +72,6 @@ async fn main() {
     tracing::info!(stream = %stream_config.name, "NATS stream ready");
 
     let agents = AgentStore::new();
-    let idempotency = IdempotencyStore::new();
-    let broker = NatsPublisher::new(js);
     let server_metrics = ServerMetrics::new();
 
     if let Some(ref repo) = agent_repo {
@@ -86,13 +86,26 @@ async fn main() {
         .as_ref()
         .map(|tls_cfg| TlsIdentity::load(tls_cfg).expect("failed to load TLS certificates"));
 
+    let idempotency = IdempotencyStore::new();
+    let broker = Arc::new(NatsPublisher::new(js));
+
     let grpc_service = {
-        let svc = AgentServiceImpl::new(agents.clone(), idempotency, broker);
+        let svc = AgentServiceImpl::new(agents.clone(), idempotency.clone(), broker.clone());
         match agent_repo {
-            Some(repo) => svc.with_repo(repo),
+            Some(ref repo) => svc.with_repo(repo.clone()),
             None => svc,
         }
     };
+
+    let session_registry = SessionRegistry::new();
+    let stream_service = StreamService::new(
+        agents.clone(),
+        idempotency,
+        broker,
+        session_registry.clone(),
+        config.key_grace_period_ms,
+    );
+
     let grpc_addr = config.grpc_addr;
 
     let grpc_tls = tls_identity.as_ref().map(|id| {
@@ -101,13 +114,14 @@ async fn main() {
     });
 
     let grpc_handle = tokio::spawn(async move {
-        tracing::info!(%grpc_addr, "gRPC listening");
+        tracing::info!(%grpc_addr, "gRPC listening (V1 + V2 streaming)");
         let mut builder = TonicServer::builder();
         if let Some(tls) = grpc_tls {
             builder = builder.tls_config(tls).expect("invalid gRPC TLS config");
         }
         builder
             .add_service(AgentServiceServer::new(grpc_service))
+            .add_service(SentinelStreamServer::new(stream_service))
             .serve(grpc_addr)
             .await
             .expect("gRPC server failed");

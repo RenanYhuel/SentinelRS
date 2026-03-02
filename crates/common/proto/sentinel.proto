@@ -1,6 +1,10 @@
 syntax = "proto3";
 package sentinel.common;
 
+// ═══════════════════════════════════════════════════════════════
+// Shared types
+// ═══════════════════════════════════════════════════════════════
+
 enum MetricType {
   METRIC_TYPE_UNSPECIFIED = 0;
   GAUGE = 1;
@@ -26,6 +30,10 @@ message Metric {
   }
   int64 timestamp_ms = 7;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// V1 Legacy (backward-compatible unary RPCs)
+// ═══════════════════════════════════════════════════════════════
 
 message Batch {
   string agent_id = 1;
@@ -63,14 +71,153 @@ message PushResponse {
   string message = 2;
 }
 
-// Gère enregistrement, métriques et heartbeats.
 service AgentService {
-  // Enregistre un agent — renvoie agent_id et secret.
   rpc Register(RegisterRequest) returns (RegisterResponse);
-
-  // Envoie un batch de métriques.
   rpc PushMetrics(Batch) returns (PushResponse);
-
-  // Envoie un heartbeat.
   rpc SendHeartbeat(Heartbeat) returns (PushResponse);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// V2 Bi-Directional Streaming Protocol
+// ═══════════════════════════════════════════════════════════════
+
+message AgentMessage {
+  oneof payload {
+    HandshakeRequest handshake = 1;
+    MetricsBatch metrics_batch = 2;
+    HeartbeatPing heartbeat_ping = 3;
+    BootstrapRequest bootstrap_request = 4;
+  }
+}
+
+message ServerMessage {
+  oneof payload {
+    HandshakeAck handshake_ack = 1;
+    BatchAck batch_ack = 2;
+    HeartbeatPong heartbeat_pong = 3;
+    BootstrapResponse bootstrap_response = 4;
+    ConfigUpdate config_update = 5;
+    Command command = 6;
+    ServerError error = 7;
+  }
+}
+
+// --- Handshake (mutual authentication) ---
+
+message HandshakeRequest {
+  string agent_id = 1;
+  string agent_version = 2;
+  repeated string capabilities = 3;
+  string key_id = 4;
+  int64 timestamp_ms = 5;
+  string signature = 6;
+}
+
+message HandshakeAck {
+  HandshakeStatus status = 1;
+  string message = 2;
+  int64 server_time_ms = 3;
+  int64 heartbeat_interval_ms = 4;
+}
+
+enum HandshakeStatus {
+  HANDSHAKE_OK = 0;
+  HANDSHAKE_REJECTED = 1;
+  HANDSHAKE_UPGRADE_REQUIRED = 2;
+}
+
+// --- Metrics via stream ---
+
+message MetricsBatch {
+  string batch_id = 1;
+  uint64 seq_start = 2;
+  uint64 seq_end = 3;
+  int64 created_at_ms = 4;
+  repeated Metric metrics = 5;
+  map<string, string> meta = 6;
+  string signature = 7;
+}
+
+message BatchAck {
+  string batch_id = 1;
+  BatchAckStatus status = 2;
+  string message = 3;
+}
+
+enum BatchAckStatus {
+  BATCH_ACCEPTED = 0;
+  BATCH_REJECTED = 1;
+  BATCH_RETRY = 2;
+}
+
+// --- Heartbeat ---
+
+message HeartbeatPing {
+  int64 timestamp_ms = 1;
+}
+
+message HeartbeatPong {
+  int64 server_time_ms = 1;
+}
+
+// --- Bootstrap (Zero-Touch Provisioning) ---
+
+message BootstrapRequest {
+  string bootstrap_token = 1;
+  string hw_id = 2;
+  string agent_version = 3;
+}
+
+message BootstrapResponse {
+  BootstrapStatus status = 1;
+  string agent_id = 2;
+  string secret = 3;
+  string key_id = 4;
+  bytes config_yaml = 5;
+  string message = 6;
+}
+
+enum BootstrapStatus {
+  BOOTSTRAP_OK = 0;
+  BOOTSTRAP_INVALID_TOKEN = 1;
+  BOOTSTRAP_EXPIRED_TOKEN = 2;
+}
+
+// --- Remote Config Update ---
+
+message ConfigUpdate {
+  int64 version = 1;
+  bytes config_yaml = 2;
+}
+
+// --- Remote Commands ---
+
+message Command {
+  string command_id = 1;
+  oneof action {
+    ReloadConfig reload_config = 2;
+    RestartCollector restart_collector = 3;
+    UpdateInterval update_interval = 4;
+  }
+}
+
+message ReloadConfig {}
+
+message RestartCollector {}
+
+message UpdateInterval {
+  uint64 interval_seconds = 1;
+}
+
+// --- Stream-level error ---
+
+message ServerError {
+  uint32 code = 1;
+  string message = 2;
+  bool fatal = 3;
+}
+
+// V2 persistent streaming service
+service SentinelStream {
+  rpc OpenStream(stream AgentMessage) returns (stream ServerMessage);
 }

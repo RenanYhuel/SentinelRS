@@ -12,3 +12,4 @@ pub mod run;
 pub mod scheduler;
 pub mod security;
 pub mod shutdown;
+pub mod stream;

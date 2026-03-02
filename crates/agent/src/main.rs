@@ -21,7 +21,7 @@ async fn main() {
         }
     };
 
-    if let Err(e) = sentinel_agent::run::run(config).await {
+    if let Err(e) = sentinel_agent::run::run(config, args.legacy_mode).await {
         tracing::error!(error = %e, "agent error");
         std::process::exit(1);
     }

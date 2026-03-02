@@ -8,4 +8,5 @@ pub mod migration;
 pub mod persistence;
 pub mod rest;
 pub mod store;
+pub mod stream;
 pub mod tls;

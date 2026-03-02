@@ -14,8 +14,9 @@ use crate::collector::SystemCollector;
 use crate::config::AgentConfig;
 use crate::exporter::{GrpcClient, RetryPolicy, SendLoop};
 use crate::scheduler::ScheduledTask;
+use crate::stream::StreamClient;
 
-pub async fn run(config: AgentConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
     let agent_id = config
         .agent_id
         .clone()
@@ -23,10 +24,16 @@ pub async fn run(config: AgentConfig) -> Result<(), Box<dyn std::error::Error>> 
 
     let secret = resolve_secret(&config)?;
 
+    let mode_label = if legacy_mode {
+        "legacy (V1)"
+    } else {
+        "stream (V2)"
+    };
     tracing::info!(
         agent_id = %agent_id,
         server = %config.server,
         interval_s = config.collect.interval_seconds,
+        mode = mode_label,
         "agent configured"
     );
 
@@ -40,13 +47,25 @@ pub async fn run(config: AgentConfig) -> Result<(), Box<dyn std::error::Error>> 
 
     spawn_collector(config.collect.interval_seconds, metrics_tx);
     spawn_batcher(agent_id.clone(), wal.clone(), metrics_rx);
-    spawn_sender(
-        config.server.clone(),
-        agent_id,
-        secret,
-        wal.clone(),
-        state.clone(),
-    );
+
+    if legacy_mode {
+        spawn_legacy_sender(
+            config.server.clone(),
+            agent_id,
+            secret,
+            wal.clone(),
+            state.clone(),
+        );
+    } else {
+        spawn_stream_sender(
+            config.server.clone(),
+            agent_id,
+            secret,
+            wal.clone(),
+            state.clone(),
+        );
+    }
+
     spawn_api(config.api_port, state).await;
 
     tracing::info!("agent running");
@@ -87,7 +106,7 @@ fn spawn_batcher(
     });
 }
 
-fn spawn_sender(
+fn spawn_legacy_sender(
     server: String,
     agent_id: String,
     secret: Vec<u8>,
@@ -131,6 +150,31 @@ fn spawn_sender(
             }
             tokio::time::sleep(Duration::from_secs(10)).await;
         }
+    });
+}
+
+fn spawn_stream_sender(
+    server: String,
+    agent_id: String,
+    secret: Vec<u8>,
+    wal: Arc<Mutex<Wal>>,
+    state: AgentState,
+) {
+    tokio::spawn(async move {
+        let version = env!("CARGO_PKG_VERSION").to_string();
+        let key_id = "default".to_string();
+
+        let client = StreamClient::new(
+            server,
+            agent_id.clone(),
+            version,
+            key_id,
+            &secret,
+            wal.clone(),
+        );
+
+        state.set_ready(true);
+        client.run(None).await;
     });
 }
 
