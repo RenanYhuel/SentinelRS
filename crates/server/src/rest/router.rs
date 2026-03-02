@@ -1,7 +1,6 @@
 use axum::routing::{get, post};
 use axum::Router;
 use sqlx::PgPool;
-use sqlx::PgPool;
 use std::sync::Arc;
 
 use super::{agents, cluster, health, key_rotation, metrics, notifiers, provisioning, rules};
