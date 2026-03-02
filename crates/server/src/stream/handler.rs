@@ -14,6 +14,7 @@ use sentinel_common::proto::{
 };
 
 use crate::broker::BrokerPublisher;
+use crate::metrics::server_metrics::ServerMetrics;
 use crate::persistence::AgentRepo;
 use crate::provisioning::{handle_bootstrap, TokenStore};
 use crate::store::{AgentStore, IdempotencyStore};
@@ -38,6 +39,7 @@ pub struct StreamService<B: BrokerPublisher> {
     token_store: Option<TokenStore>,
     agent_repo: Option<Arc<AgentRepo>>,
     server_url: String,
+    metrics: Arc<ServerMetrics>,
 }
 
 impl<B: BrokerPublisher> StreamService<B> {
@@ -48,6 +50,7 @@ impl<B: BrokerPublisher> StreamService<B> {
         registry: SessionRegistry,
         events: PresenceEventBus,
         grace_period_ms: i64,
+        metrics: Arc<ServerMetrics>,
     ) -> Self {
         Self {
             agents,
@@ -59,6 +62,7 @@ impl<B: BrokerPublisher> StreamService<B> {
             token_store: None,
             agent_repo: None,
             server_url: String::new(),
+            metrics,
         }
     }
 
@@ -99,6 +103,7 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
         let agent_repo = self.agent_repo.clone();
         let server_url = self.server_url.clone();
         let events = self.events.clone();
+        let metrics = self.metrics.clone();
 
         tokio::spawn(async move {
             if let Err(e) = run_stream(
@@ -113,6 +118,7 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
                 token_store,
                 agent_repo,
                 server_url,
+                metrics,
             )
             .await
             {
@@ -138,6 +144,7 @@ async fn run_stream<B: BrokerPublisher>(
     token_store: Option<TokenStore>,
     agent_repo: Option<Arc<AgentRepo>>,
     server_url: String,
+    metrics: Arc<ServerMetrics>,
 ) -> Result<(), StreamError> {
     let (agent_id, key_id) = wait_for_handshake(
         &mut inbound,
@@ -175,6 +182,7 @@ async fn run_stream<B: BrokerPublisher>(
         &registry,
         &events,
         grace_period_ms,
+        &metrics,
     )
     .await;
 
@@ -351,6 +359,7 @@ async fn message_loop<B: BrokerPublisher>(
     registry: &SessionRegistry,
     events: &PresenceEventBus,
     grace_period_ms: i64,
+    metrics: &Arc<ServerMetrics>,
 ) -> Result<(), StreamError> {
     while let Some(result) = inbound.next().await {
         let msg = result.map_err(|e| StreamError::Transport(e.to_string()))?;
@@ -365,6 +374,7 @@ async fn message_loop<B: BrokerPublisher>(
             registry,
             events,
             grace_period_ms,
+            metrics,
         )
         .await
         {

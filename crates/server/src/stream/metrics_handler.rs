@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use sentinel_common::proto::{
     server_message::Payload, Batch, BatchAck, BatchAckStatus, MetricsBatch, ServerMessage,
 };
 
 use crate::auth::verify_signature;
 use crate::broker::BrokerPublisher;
+use crate::metrics::server_metrics::ServerMetrics;
 use crate::store::{AgentStore, IdempotencyStore};
 
 pub async fn handle_metrics_batch(
@@ -14,8 +17,10 @@ pub async fn handle_metrics_batch(
     idempotency: &IdempotencyStore,
     broker: &dyn BrokerPublisher,
     grace_period_ms: i64,
+    metrics: &Arc<ServerMetrics>,
 ) -> ServerMessage {
     if batch.batch_id.is_empty() {
+        metrics.inc_pushes_rejected();
         return ack_message(
             &batch.batch_id,
             BatchAckStatus::BatchRejected,
@@ -34,6 +39,7 @@ pub async fn handle_metrics_batch(
     let secret = match agents.find_key_secret(agent_id, Some(key_id), grace_period_ms) {
         Some(s) => s,
         None => {
+            metrics.inc_pushes_rejected();
             return ack_message(
                 &batch.batch_id,
                 BatchAckStatus::BatchRejected,
@@ -46,6 +52,7 @@ pub async fn handle_metrics_batch(
     let canonical = sentinel_common::canonicalize::canonical_bytes(&legacy_batch);
 
     if !batch.signature.is_empty() && !verify_signature(&secret, &canonical, &batch.signature) {
+        metrics.inc_pushes_rejected();
         return ack_message(
             &batch.batch_id,
             BatchAckStatus::BatchRejected,
@@ -64,6 +71,7 @@ pub async fn handle_metrics_batch(
         .await
     {
         tracing::error!(batch_id = %batch.batch_id, error = %e, "broker publish failed");
+        metrics.inc_broker_publish_errors();
         return ack_message(
             &batch.batch_id,
             BatchAckStatus::BatchRetry,
@@ -73,6 +81,8 @@ pub async fn handle_metrics_batch(
 
     let now_ms = current_time_ms();
     idempotency.mark_processed(batch.batch_id.clone(), now_ms);
+
+    metrics.inc_pushes_accepted();
 
     ack_message(&batch.batch_id, BatchAckStatus::BatchAccepted, "accepted")
 }

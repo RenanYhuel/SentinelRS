@@ -12,6 +12,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::{Channel, Server};
 
 use sentinel_server::broker::InMemoryBroker;
+use sentinel_server::metrics::server_metrics::ServerMetrics;
 use sentinel_server::provisioning::{BootstrapToken, TokenStore};
 use sentinel_server::store::{AgentStore, IdempotencyStore};
 use sentinel_server::stream::{PresenceEventBus, SessionRegistry, StreamService};
@@ -40,6 +41,7 @@ impl ProvisioningTestServer {
             registry,
             events,
             300_000,
+            ServerMetrics::new(),
         )
         .with_provisioning(token_store.clone(), None, "grpc://127.0.0.1:50051".into());
 

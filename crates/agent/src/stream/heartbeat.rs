@@ -6,6 +6,7 @@ pub fn collect_system_stats() -> SystemStats {
     let mut sys = System::new();
     sys.refresh_cpu_all();
     sys.refresh_memory();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
     let disks = sysinfo::Disks::new_with_refreshed_list();
     let (disk_used, disk_total) = disks.iter().fold((0u64, 0u64), |(u, t), d| {

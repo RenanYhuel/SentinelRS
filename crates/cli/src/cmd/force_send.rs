@@ -14,6 +14,12 @@ pub struct ForceSendArgs {
     limit: usize,
     #[arg(long, short)]
     yes: bool,
+    #[arg(long, help = "Path to WAL directory (overrides agent config)")]
+    wal_dir: Option<String>,
+    #[arg(long, help = "Path to credentials.json (overrides default)")]
+    credentials: Option<String>,
+    #[arg(long, default_value = "64", help = "WAL segment size in MB")]
+    segment_size_mb: u64,
 }
 
 pub async fn run(
@@ -22,10 +28,13 @@ pub async fn run(
     server: Option<String>,
     config_path: Option<String>,
 ) -> Result<()> {
-    let cfg = crate::cmd::wal::helpers::load_agent_config(config_path.as_deref())?;
-    let endpoint = server.as_deref().unwrap_or(&cfg.server);
-    let dir = PathBuf::from(&cfg.buffer.wal_dir);
-    let mut wal = Wal::open(&dir, false, cfg.buffer.segment_size_mb * 1024 * 1024)?;
+    let (endpoint, dir) = resolve_endpoint_and_wal(
+        server.as_deref(),
+        args.wal_dir.as_deref(),
+        config_path.as_deref(),
+    )?;
+    let segment_bytes = args.segment_size_mb * 1024 * 1024;
+    let mut wal = Wal::open(&dir, false, segment_bytes)?;
     let entries = wal.iter_unacked()?;
 
     if entries.is_empty() {
@@ -50,7 +59,7 @@ pub async fn run(
         }
     }
 
-    let creds = load_credentials()?;
+    let creds = load_credentials(args.credentials.as_deref())?;
 
     let secret = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &creds.secret)
         .context("invalid base64 secret")?;
@@ -60,7 +69,7 @@ pub async fn run(
         OutputMode::Json => None,
     };
 
-    let mut client = GrpcClient::connect(endpoint, creds.agent_id.clone(), &secret, None)
+    let mut client = GrpcClient::connect(&endpoint, creds.agent_id.clone(), &secret, None)
         .await
         .context("failed to connect")?;
 
@@ -135,17 +144,38 @@ pub async fn run(
     Ok(())
 }
 
+fn resolve_endpoint_and_wal(
+    server: Option<&str>,
+    wal_dir: Option<&str>,
+    config_path: Option<&str>,
+) -> Result<(String, PathBuf)> {
+    match (server, wal_dir) {
+        (Some(s), Some(w)) => Ok((s.to_string(), PathBuf::from(w))),
+        _ => {
+            let cfg = crate::cmd::wal::helpers::load_agent_config(config_path)?;
+            let endpoint = server.unwrap_or(&cfg.server).to_string();
+            let dir = wal_dir
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from(&cfg.buffer.wal_dir));
+            Ok((endpoint, dir))
+        }
+    }
+}
+
 #[derive(serde::Deserialize)]
 struct Credentials {
     agent_id: String,
     secret: String,
 }
 
-fn load_credentials() -> Result<Credentials> {
-    let path = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("sentinel")
-        .join("credentials.json");
+fn load_credentials(path: Option<&str>) -> Result<Credentials> {
+    let path = match path {
+        Some(p) => PathBuf::from(p),
+        None => dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("sentinel")
+            .join("credentials.json"),
+    };
 
     let data = std::fs::read_to_string(&path)
         .with_context(|| format!("cannot read credentials from {}", path.display()))?;

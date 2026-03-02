@@ -40,10 +40,10 @@ RUN chmod +x /usr/local/bin/sentinel_workers
 
 USER sentinel
 
-EXPOSE 9091
+EXPOSE 9090
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost:9091/healthz || exit 1
+    CMD curl -f http://localhost:9090/healthz || exit 1
 
 LABEL org.opencontainers.image.title="SentinelRS Worker" \
       org.opencontainers.image.description="SentinelRS metric processing worker — NATS consumer + TimescaleDB writer" \

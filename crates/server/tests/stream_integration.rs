@@ -13,6 +13,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::{Channel, Server};
 
 use sentinel_server::broker::InMemoryBroker;
+use sentinel_server::metrics::server_metrics::ServerMetrics;
 use sentinel_server::store::{AgentRecord, AgentStore, IdempotencyStore};
 use sentinel_server::stream::{PresenceEventBus, SessionRegistry, StreamService};
 
@@ -41,6 +42,7 @@ impl StreamTestServer {
             registry.clone(),
             events.clone(),
             300_000,
+            ServerMetrics::new(),
         );
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
