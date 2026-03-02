@@ -9,16 +9,27 @@ use crate::broker::BrokerPublisher;
 use crate::metrics::server_metrics::ServerMetrics;
 use crate::store::{AgentStore, IdempotencyStore};
 
+pub struct MetricsHandlerCtx<'a> {
+    pub agents: &'a AgentStore,
+    pub idempotency: &'a IdempotencyStore,
+    pub broker: &'a dyn BrokerPublisher,
+    pub grace_period_ms: i64,
+    pub metrics: &'a Arc<ServerMetrics>,
+}
+
 pub async fn handle_metrics_batch(
     agent_id: &str,
     key_id: &str,
     batch: MetricsBatch,
-    agents: &AgentStore,
-    idempotency: &IdempotencyStore,
-    broker: &dyn BrokerPublisher,
-    grace_period_ms: i64,
-    metrics: &Arc<ServerMetrics>,
+    ctx: &MetricsHandlerCtx<'_>,
 ) -> ServerMessage {
+    let MetricsHandlerCtx {
+        agents,
+        idempotency,
+        broker,
+        grace_period_ms,
+        metrics,
+    } = ctx;
     if batch.batch_id.is_empty() {
         metrics.inc_pushes_rejected();
         return ack_message(
@@ -36,7 +47,7 @@ pub async fn handle_metrics_batch(
         );
     }
 
-    let secret = match agents.find_key_secret(agent_id, Some(key_id), grace_period_ms) {
+    let secret = match agents.find_key_secret(agent_id, Some(key_id), *grace_period_ms) {
         Some(s) => s,
         None => {
             metrics.inc_pushes_rejected();
