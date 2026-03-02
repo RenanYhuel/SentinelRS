@@ -1,6 +1,7 @@
 use std::pin::Pin;
 use std::sync::Arc;
 
+use chrono::Utc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
@@ -19,6 +20,7 @@ use crate::store::{AgentStore, IdempotencyStore};
 
 use super::authenticator::{authenticate_handshake, AuthOutcome};
 use super::dispatcher;
+use super::presence::{DisconnectReason, PresenceEvent, PresenceEventBus};
 use super::registry::SessionRegistry;
 use super::session::Session;
 
@@ -31,6 +33,7 @@ pub struct StreamService<B: BrokerPublisher> {
     idempotency: IdempotencyStore,
     broker: Arc<B>,
     registry: SessionRegistry,
+    events: PresenceEventBus,
     grace_period_ms: i64,
     token_store: Option<TokenStore>,
     agent_repo: Option<Arc<AgentRepo>>,
@@ -43,6 +46,7 @@ impl<B: BrokerPublisher> StreamService<B> {
         idempotency: IdempotencyStore,
         broker: Arc<B>,
         registry: SessionRegistry,
+        events: PresenceEventBus,
         grace_period_ms: i64,
     ) -> Self {
         Self {
@@ -50,6 +54,7 @@ impl<B: BrokerPublisher> StreamService<B> {
             idempotency,
             broker,
             registry,
+            events,
             grace_period_ms,
             token_store: None,
             agent_repo: None,
@@ -93,6 +98,7 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
         let token_store = self.token_store.clone();
         let agent_repo = self.agent_repo.clone();
         let server_url = self.server_url.clone();
+        let events = self.events.clone();
 
         tokio::spawn(async move {
             if let Err(e) = run_stream(
@@ -102,6 +108,7 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
                 idempotency,
                 broker,
                 registry,
+                events,
                 grace_period_ms,
                 token_store,
                 agent_repo,
@@ -125,6 +132,7 @@ async fn run_stream<B: BrokerPublisher>(
     idempotency: IdempotencyStore,
     broker: Arc<B>,
     registry: SessionRegistry,
+    events: PresenceEventBus,
     grace_period_ms: i64,
     token_store: Option<TokenStore>,
     agent_repo: Option<Arc<AgentRepo>>,
@@ -144,6 +152,17 @@ async fn run_stream<B: BrokerPublisher>(
 
     tracing::info!(agent_id = %agent_id, "stream authenticated");
 
+    let version = registry
+        .snapshot(&agent_id)
+        .map(|s| s.agent_version)
+        .unwrap_or_default();
+
+    events.emit(PresenceEvent::AgentConnected {
+        agent_id: agent_id.clone(),
+        agent_version: version,
+        at: Utc::now(),
+    });
+
     let result = message_loop(
         &agent_id,
         &key_id,
@@ -153,11 +172,31 @@ async fn run_stream<B: BrokerPublisher>(
         &idempotency,
         broker.as_ref(),
         &registry,
+        &events,
         grace_period_ms,
     )
     .await;
 
+    let duration_ms = registry
+        .snapshot(&agent_id)
+        .map(|s| s.connection_duration_ms)
+        .unwrap_or(0);
+
     registry.unregister(&agent_id);
+
+    let reason = match &result {
+        Ok(()) => DisconnectReason::StreamClosed,
+        Err(StreamError::StreamClosed) => DisconnectReason::StreamClosed,
+        Err(_) => DisconnectReason::StreamClosed,
+    };
+
+    events.emit(PresenceEvent::AgentDisconnected {
+        agent_id: agent_id.clone(),
+        reason,
+        connected_duration_ms: duration_ms,
+        at: Utc::now(),
+    });
+
     tracing::info!(agent_id = %agent_id, "stream disconnected");
 
     result
@@ -307,6 +346,7 @@ async fn message_loop<B: BrokerPublisher>(
     idempotency: &IdempotencyStore,
     broker: &B,
     registry: &SessionRegistry,
+    events: &PresenceEventBus,
     grace_period_ms: i64,
 ) -> Result<(), StreamError> {
     while let Some(result) = inbound.next().await {
@@ -320,6 +360,7 @@ async fn message_loop<B: BrokerPublisher>(
             idempotency,
             broker,
             registry,
+            events,
             grace_period_ms,
         )
         .await

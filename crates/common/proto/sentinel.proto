@@ -150,14 +150,29 @@ enum BatchAckStatus {
   BATCH_RETRY = 2;
 }
 
-// --- Heartbeat ---
+// --- Heartbeat (with live telemetry) ---
 
 message HeartbeatPing {
   int64 timestamp_ms = 1;
+  SystemStats system_stats = 2;
+}
+
+message SystemStats {
+  double cpu_percent = 1;
+  uint64 memory_used_bytes = 2;
+  uint64 memory_total_bytes = 3;
+  uint64 disk_used_bytes = 4;
+  uint64 disk_total_bytes = 5;
+  double load_avg_1m = 6;
+  uint32 process_count = 7;
+  uint64 uptime_seconds = 8;
+  string os_name = 9;
+  string hostname = 10;
 }
 
 message HeartbeatPong {
   int64 server_time_ms = 1;
+  int64 next_heartbeat_interval_ms = 2;
 }
 
 // --- Bootstrap (Zero-Touch Provisioning) ---

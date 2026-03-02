@@ -31,7 +31,7 @@ dashmap = "6"
 async-nats = "0.38"
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono"] }
 chrono = { version = "0.4", features = ["serde"] }
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["sync"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

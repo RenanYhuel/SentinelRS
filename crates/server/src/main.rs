@@ -9,7 +9,9 @@ use sentinel_server::persistence::AgentRepo;
 use sentinel_server::provisioning::TokenStore;
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
-use sentinel_server::stream::{SessionRegistry, StreamService};
+use sentinel_server::stream::{
+    spawn_watchdog, PresenceEventBus, SessionRegistry, StreamService, WatchdogConfig,
+};
 use sentinel_server::tls::TlsIdentity;
 
 use sentinel_common::nats_config::StreamConfig;
@@ -99,14 +101,22 @@ async fn main() {
     };
 
     let session_registry = SessionRegistry::new();
+    let presence_events = PresenceEventBus::new();
     let token_store = TokenStore::new();
     let grpc_public_url = format!("http://{}", config.grpc_addr);
+
+    spawn_watchdog(
+        session_registry.clone(),
+        presence_events.clone(),
+        WatchdogConfig::default(),
+    );
 
     let stream_service = StreamService::new(
         agents.clone(),
         idempotency,
         broker,
         session_registry.clone(),
+        presence_events.clone(),
         config.key_grace_period_ms,
     )
     .with_provisioning(
@@ -144,6 +154,8 @@ async fn main() {
         pool,
         token_store: Some(token_store),
         grpc_public_url,
+        registry: session_registry,
+        events: presence_events,
     };
     let rest_app = rest::router(app_state);
     let rest_addr = config.rest_addr;

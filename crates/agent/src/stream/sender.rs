@@ -1,10 +1,12 @@
 use tokio::sync::mpsc;
 
 use sentinel_common::proto::{
-    agent_message::Payload as AgentPayload, AgentMessage, HeartbeatPing, MetricsBatch,
+    agent_message::Payload as AgentPayload, AgentMessage, HeartbeatPing, MetricsBatch, SystemStats,
 };
 
 use crate::security::HmacSigner;
+
+use super::heartbeat::collect_system_stats;
 
 #[derive(Clone)]
 pub struct StreamSender {
@@ -47,9 +49,15 @@ impl StreamSender {
     }
 
     pub async fn send_heartbeat(&self) -> Result<(), SendError> {
+        let stats = collect_system_stats();
+        self.send_heartbeat_with_stats(stats).await
+    }
+
+    pub async fn send_heartbeat_with_stats(&self, stats: SystemStats) -> Result<(), SendError> {
         let msg = AgentMessage {
             payload: Some(AgentPayload::HeartbeatPing(HeartbeatPing {
                 timestamp_ms: current_time_ms(),
+                system_stats: Some(stats),
             })),
         };
         self.tx

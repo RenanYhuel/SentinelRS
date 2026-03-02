@@ -8,6 +8,7 @@ use crate::store::{AgentStore, IdempotencyStore};
 
 use super::heartbeat_handler::handle_heartbeat_ping;
 use super::metrics_handler::handle_metrics_batch;
+use super::presence::PresenceEventBus;
 use super::registry::SessionRegistry;
 
 pub async fn dispatch(
@@ -18,6 +19,7 @@ pub async fn dispatch(
     idempotency: &IdempotencyStore,
     broker: &dyn BrokerPublisher,
     registry: &SessionRegistry,
+    events: &PresenceEventBus,
     grace_period_ms: i64,
 ) -> Option<ServerMessage> {
     let payload = match msg.payload {
@@ -40,7 +42,7 @@ pub async fn dispatch(
             Some(response)
         }
         AgentPayload::HeartbeatPing(ping) => {
-            let response = handle_heartbeat_ping(agent_id, ping.timestamp_ms, registry);
+            let response = handle_heartbeat_ping(agent_id, &ping, registry, events);
             Some(response)
         }
         AgentPayload::Handshake(_) => Some(error_message(
