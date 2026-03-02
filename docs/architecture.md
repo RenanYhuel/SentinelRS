@@ -115,7 +115,7 @@ Admin command-line tool. Communicates with the server REST API and reads local a
 
 Commands: `init`, `doctor`, `completions`, `agents` (list, get, live, delete, generate-install), `cluster` (status, agents, watch), `config`, `rules`, `notifiers`, `key`, `wal`, `metrics`, `health`, `status`, `register`, `force-send`, `version`.
 
-Full reference: [cli-v2.md](cli-v2.md)
+Full reference: [cli.md](cli.md)
 
 ## Database Schema
 

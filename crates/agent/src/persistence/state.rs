@@ -39,8 +39,8 @@ impl AgentPersistedState {
             return Ok(None);
         }
         let data = fs::read_to_string(&path)?;
-        let state: Self =
-            serde_json::from_str(&data).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let state: Self = serde_json::from_str(&data)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         Ok(Some(state))
     }
 

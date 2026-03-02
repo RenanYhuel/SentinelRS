@@ -4,9 +4,9 @@ use std::sync::Arc;
 use chrono::{Duration, Utc};
 
 use sentinel_common::proto::agent_message::Payload as AgentPayload;
-use sentinel_common::proto::server_message::Payload as ServerPayload;
 use sentinel_common::proto::sentinel_stream_client::SentinelStreamClient;
 use sentinel_common::proto::sentinel_stream_server::SentinelStreamServer;
+use sentinel_common::proto::server_message::Payload as ServerPayload;
 use sentinel_common::proto::{AgentMessage, BootstrapRequest, BootstrapStatus};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::{Channel, Server};
@@ -119,10 +119,7 @@ async fn bootstrap_with_valid_token() {
 
     tx.send(bootstrap_message("tok-valid-123")).await.unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
 
     let msg = stream.message().await.unwrap().unwrap();
@@ -149,10 +146,7 @@ async fn bootstrap_with_invalid_token() {
 
     tx.send(bootstrap_message("no-such-token")).await.unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
 
     let msg = stream.message().await.unwrap().unwrap();

@@ -30,5 +30,3 @@ pub fn text_optional(prompt: &str) -> Result<Option<String>> {
         Ok(Some(val))
     }
 }
-
-

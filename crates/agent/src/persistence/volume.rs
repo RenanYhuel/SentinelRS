@@ -113,8 +113,14 @@ mod tests {
     #[test]
     fn layout_paths() {
         let layout = VolumeLayout::new(Path::new("/etc/sentinel"));
-        assert_eq!(layout.config_file(), PathBuf::from("/etc/sentinel/config.yml"));
-        assert_eq!(layout.state_file(), PathBuf::from("/etc/sentinel/state/agent.state.json"));
+        assert_eq!(
+            layout.config_file(),
+            PathBuf::from("/etc/sentinel/config.yml")
+        );
+        assert_eq!(
+            layout.state_file(),
+            PathBuf::from("/etc/sentinel/state/agent.state.json")
+        );
         assert_eq!(layout.wal_dir(None), PathBuf::from("/etc/sentinel/wal"));
         assert_eq!(
             layout.wal_dir(Some("/custom/wal")),

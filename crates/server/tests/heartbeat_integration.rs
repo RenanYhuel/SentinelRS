@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use sentinel_common::crypto::sign_data;
 use sentinel_common::proto::agent_message::Payload as AgentPayload;
-use sentinel_common::proto::server_message::Payload as ServerPayload;
 use sentinel_common::proto::sentinel_stream_client::SentinelStreamClient;
 use sentinel_common::proto::sentinel_stream_server::SentinelStreamServer;
+use sentinel_common::proto::server_message::Payload as ServerPayload;
 use sentinel_common::proto::{
     AgentMessage, HandshakeRequest, HandshakeStatus, HeartbeatPing, SystemStats,
 };
@@ -158,10 +158,7 @@ async fn heartbeat_ping_pong() {
         .await
         .unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
 
     let ack = stream.message().await.unwrap().unwrap();
@@ -201,31 +198,22 @@ async fn heartbeat_emits_presence_event() {
         .await
         .unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
     let _ack = stream.message().await.unwrap().unwrap();
 
-    let _connected = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        rx_events.recv(),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    let _connected = tokio::time::timeout(std::time::Duration::from_secs(2), rx_events.recv())
+        .await
+        .unwrap()
+        .unwrap();
 
     tx.send(build_heartbeat_ping()).await.unwrap();
     let _pong = stream.message().await.unwrap().unwrap();
 
-    let evt = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        rx_events.recv(),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    let evt = tokio::time::timeout(std::time::Duration::from_secs(2), rx_events.recv())
+        .await
+        .unwrap()
+        .unwrap();
 
     match &evt {
         sentinel_server::stream::PresenceEvent::HeartbeatReceived {
@@ -255,10 +243,7 @@ async fn session_registered_after_handshake() {
         .await
         .unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
     let _ack = stream.message().await.unwrap().unwrap();
 
@@ -282,10 +267,7 @@ async fn stale_detection_after_timeout() {
         .await
         .unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
     let _ack = stream.message().await.unwrap().unwrap();
 

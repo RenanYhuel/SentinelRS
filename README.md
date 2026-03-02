@@ -91,7 +91,7 @@ cargo build --workspace --release
 | [Architecture](docs/architecture.md)   | System design, data flow, crate responsibilities     |
 | [Streaming](docs/streaming.md)         | gRPC V2 bidirectional protocol                       |
 | [Provisioning](docs/provisioning.md)   | Bootstrap tokens and zero-touch agent setup          |
-| [CLI Reference](docs/cli-v2.md)        | All V2 commands with usage examples                  |
+| [CLI Reference](docs/cli.md)           | All commands with usage examples                     |
 | [CLI (V1 legacy)](docs/cli.md)         | V1 command reference                                 |
 | [Configuration](docs/configuration.md) | Agent, server and worker settings                    |
 | [Deployment](docs/deployment.md)       | Docker strategy, production checklist, TLS setup     |

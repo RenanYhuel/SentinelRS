@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use sentinel_common::crypto::sign_data;
 use sentinel_common::proto::agent_message::Payload as AgentPayload;
-use sentinel_common::proto::server_message::Payload as ServerPayload;
 use sentinel_common::proto::sentinel_stream_client::SentinelStreamClient;
 use sentinel_common::proto::sentinel_stream_server::SentinelStreamServer;
+use sentinel_common::proto::server_message::Payload as ServerPayload;
 use sentinel_common::proto::{
     AgentMessage, BatchAckStatus, HandshakeRequest, HandshakeStatus, Metric, MetricsBatch,
 };
@@ -160,10 +160,7 @@ async fn handshake_then_batch_ack() {
         .await
         .unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
 
     let ack = stream.message().await.unwrap().unwrap();
@@ -201,10 +198,7 @@ async fn handshake_rejected_unknown_agent() {
         .await
         .unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
 
     let msg = stream.message().await.unwrap().unwrap();
@@ -231,10 +225,7 @@ async fn duplicate_batch_idempotent() {
         .await
         .unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
 
     let _handshake_ack = stream.message().await.unwrap().unwrap();
@@ -277,20 +268,14 @@ async fn presence_events_on_connect_disconnect() {
         .await
         .unwrap();
 
-    let response = client
-        .open_stream(ReceiverStream::new(rx))
-        .await
-        .unwrap();
+    let response = client.open_stream(ReceiverStream::new(rx)).await.unwrap();
     let mut stream = response.into_inner();
     let _ack = stream.message().await.unwrap().unwrap();
 
-    let event = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        rx_events.recv(),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    let event = tokio::time::timeout(std::time::Duration::from_secs(2), rx_events.recv())
+        .await
+        .unwrap()
+        .unwrap();
 
     match &event {
         sentinel_server::stream::PresenceEvent::AgentConnected { agent_id, .. } => {
@@ -302,13 +287,10 @@ async fn presence_events_on_connect_disconnect() {
     drop(tx);
     drop(stream);
 
-    let disconnect = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        rx_events.recv(),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    let disconnect = tokio::time::timeout(std::time::Duration::from_secs(2), rx_events.recv())
+        .await
+        .unwrap()
+        .unwrap();
 
     match &disconnect {
         sentinel_server::stream::PresenceEvent::AgentDisconnected { agent_id, .. } => {

@@ -85,6 +85,6 @@ sentinel cluster status
 - [Docker guide](docker.md) — full Docker deployment reference
 - [Provisioning](provisioning.md) — bootstrap tokens and zero-touch provisioning
 - [Streaming](streaming.md) — gRPC V2 bidirectional protocol
-- [CLI reference](cli-v2.md) — all commands and options
+- [CLI reference](cli.md) — all commands and options
 - [Configuration](configuration.md) — agent, server and worker settings
 - [Architecture](architecture.md) — system design and data flow
