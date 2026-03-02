@@ -125,6 +125,7 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_stream<B: BrokerPublisher>(
     mut inbound: Streaming<AgentMessage>,
     tx: Arc<mpsc::Sender<Result<ServerMessage, Status>>>,
@@ -202,6 +203,7 @@ async fn run_stream<B: BrokerPublisher>(
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn wait_for_handshake(
     inbound: &mut Streaming<AgentMessage>,
     tx: &Arc<mpsc::Sender<Result<ServerMessage, Status>>>,
@@ -337,6 +339,7 @@ async fn complete_handshake(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn message_loop<B: BrokerPublisher>(
     agent_id: &str,
     key_id: &str,

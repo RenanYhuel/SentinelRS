@@ -24,7 +24,7 @@ pub async fn run(args: LiveArgs, mode: OutputMode, server: Option<String>) -> Re
 
     if mode == OutputMode::Json {
         let snap = api.get_json(&format!("/v1/agents/{agent_id}/live")).await?;
-        return print_json(&snap).map_err(Into::into);
+        return print_json(&snap);
     }
 
     println!();
