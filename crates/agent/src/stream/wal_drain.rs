@@ -54,7 +54,7 @@ async fn drain_pending(sender: &StreamSender, wal: &Arc<Mutex<Wal>>) -> usize {
         }
         sent += 1;
 
-        if sent % SAVE_INTERVAL_BATCHES == 0 {
+        if sent.is_multiple_of(SAVE_INTERVAL_BATCHES) {
             tokio::task::yield_now().await;
         }
     }

@@ -10,7 +10,7 @@ use crate::metrics::server_metrics::ServerMetrics;
 use crate::store::{AgentStore, IdempotencyStore};
 
 use super::heartbeat_handler::handle_heartbeat_ping;
-use super::metrics_handler::handle_metrics_batch;
+use super::metrics_handler::{handle_metrics_batch, MetricsHandlerCtx};
 use super::presence::PresenceEventBus;
 use super::registry::SessionRegistry;
 
@@ -34,17 +34,14 @@ pub async fn dispatch(
 
     match payload {
         AgentPayload::MetricsBatch(batch) => {
-            let response = handle_metrics_batch(
-                agent_id,
-                key_id,
-                batch,
+            let ctx = MetricsHandlerCtx {
                 agents,
                 idempotency,
                 broker,
                 grace_period_ms,
                 metrics,
-            )
-            .await;
+            };
+            let response = handle_metrics_batch(agent_id, key_id, batch, &ctx).await;
             Some(response)
         }
         AgentPayload::HeartbeatPing(ping) => {
