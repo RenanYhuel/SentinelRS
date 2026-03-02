@@ -16,6 +16,7 @@ use super::handshake::{build_handshake_message, validate_handshake_ack, Handshak
 use super::receiver;
 use super::reconnect::ReconnectPolicy;
 use super::sender::StreamSender;
+use super::wal_drain;
 
 const OUTBOUND_BUFFER: usize = 256;
 const HANDSHAKE_TIMEOUT_SECS: u64 = 15;
@@ -137,9 +138,16 @@ impl StreamClient {
             }
         });
 
+        let drain_sender = sender.clone();
+        let drain_wal = self.wal.clone();
+        let drain_handle = tokio::spawn(async move {
+            wal_drain::drain_loop(drain_sender, drain_wal).await;
+        });
+
         let recv_result = receiver::receive_loop(inbound, self.wal.clone()).await;
 
         heartbeat_handle.abort();
+        drain_handle.abort();
 
         match recv_result {
             Ok(()) => Ok(()),
