@@ -11,6 +11,7 @@ use super::metrics_handler::handle_metrics_batch;
 use super::presence::PresenceEventBus;
 use super::registry::SessionRegistry;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn dispatch(
     agent_id: &str,
     key_id: &str,

@@ -1,6 +1,7 @@
 use std::fmt;
 use tracing::field::{Field, Visit};
 
+#[derive(Default)]
 pub struct MessageVisitor {
     pub message: String,
     pub fields: Vec<(String, String)>,
@@ -8,10 +9,7 @@ pub struct MessageVisitor {
 
 impl MessageVisitor {
     pub fn new() -> Self {
-        Self {
-            message: String::new(),
-            fields: Vec::new(),
-        }
+        Self::default()
     }
 }
 

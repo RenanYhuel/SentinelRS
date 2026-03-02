@@ -16,11 +16,12 @@ pub struct DeleteArgs {
 pub async fn run(args: DeleteArgs, mode: OutputMode, server: Option<String>) -> Result<()> {
     let api = client::build_client(server.as_deref())?;
 
-    if mode == OutputMode::Human && !args.yes {
-        if !confirm::confirm_action(&format!("Delete rule '{}'?", args.id)) {
-            theme::print_dim("  Cancelled.");
-            return Ok(());
-        }
+    if mode == OutputMode::Human
+        && !args.yes
+        && !confirm::confirm_action(&format!("Delete rule '{}'?", args.id))
+    {
+        theme::print_dim("  Cancelled.");
+        return Ok(());
     }
 
     let sp = match mode {
