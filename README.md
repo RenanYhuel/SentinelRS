@@ -47,7 +47,7 @@ Agent                              Server                         Workers
 
 | Crate            | Role                                                                      |
 | ---------------- | ------------------------------------------------------------------------- |
-| `crates/common`  | Protobuf types (V1 + V2 streaming), crypto helpers, NATS config           |
+| `crates/common`  | Protobuf types, crypto helpers, NATS config                               |
 | `crates/agent`   | Agent binary — collectors, WAL, streaming client, bootstrap, WASM runtime |
 | `crates/server`  | Ingestion gateway — gRPC streaming + REST API, provisioning, presence     |
 | `crates/workers` | JetStream consumers, DB writers, aggregator, alert engine, notifiers      |
@@ -89,10 +89,9 @@ cargo build --workspace --release
 | [Quick Start](docs/quickstart.md)      | 5-minute Docker-first setup guide                    |
 | [Docker](docs/docker.md)               | Images, compose, scaling, production                 |
 | [Architecture](docs/architecture.md)   | System design, data flow, crate responsibilities     |
-| [Streaming](docs/streaming.md)         | gRPC V2 bidirectional protocol                       |
+| [Streaming](docs/streaming.md)         | gRPC bidirectional protocol                          |
 | [Provisioning](docs/provisioning.md)   | Bootstrap tokens and zero-touch agent setup          |
 | [CLI Reference](docs/cli.md)           | All commands with usage examples                     |
-| [CLI (V1 legacy)](docs/cli.md)         | V1 command reference                                 |
 | [Configuration](docs/configuration.md) | Agent, server and worker settings                    |
 | [Deployment](docs/deployment.md)       | Docker strategy, production checklist, TLS setup     |
 | [Security](docs/security.md)           | HMAC signing, encryption, key rotation, WASM sandbox |
