@@ -9,12 +9,16 @@ use tokio::sync::{mpsc, Mutex};
 
 use crate::api::{self, AgentState};
 use crate::batch::BatchComposer;
-use crate::buffer::Wal;
+use crate::buffer::{compact, needs_compaction, Wal};
 use crate::collector::SystemCollector;
 use crate::config::AgentConfig;
 use crate::exporter::{GrpcClient, RetryPolicy, SendLoop};
+use crate::persistence::{AgentPersistedState, VolumeLayout};
 use crate::scheduler::ScheduledTask;
 use crate::stream::StreamClient;
+
+const COMPACTION_THRESHOLD_MB: u64 = 32;
+const STATE_SAVE_INTERVAL_SECS: u64 = 60;
 
 pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn std::error::Error>> {
     let agent_id = config
@@ -40,14 +44,37 @@ pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn s
 
     let segment_bytes = config.buffer.segment_size_mb * 1024 * 1024;
     let wal = Wal::open(Path::new(&config.buffer.wal_dir), true, segment_bytes)?;
+
+    run_compaction_if_needed(&config.buffer.wal_dir, &wal)?;
+
+    let resume_seq = wal.next_id();
+    let pending = wal.unacked_count()?;
+
+    if pending > 0 {
+        tracing::info!(
+            target: "boot",
+            pending,
+            resume_seq,
+            "Resuming from previous state. {} pending batches in WAL",
+            pending
+        );
+    }
+
     let wal = Arc::new(Mutex::new(wal));
 
     let state = AgentState::new();
 
+    let config_parent = Path::new(&config.buffer.wal_dir)
+        .parent()
+        .unwrap_or_else(|| Path::new("/etc/sentinel"));
+    let layout = VolumeLayout::new(config_parent);
+    let persisted = load_or_create_persisted_state(&layout, &agent_id, &config.server, resume_seq)?;
+    let persisted = Arc::new(Mutex::new(persisted));
+
     let (metrics_tx, metrics_rx) = mpsc::channel(256);
 
     spawn_collector(config.collect.interval_seconds, metrics_tx);
-    spawn_batcher(agent_id.clone(), wal.clone(), metrics_rx);
+    spawn_batcher(agent_id.clone(), wal.clone(), metrics_rx, resume_seq);
 
     if legacy_mode {
         spawn_legacy_sender(
@@ -68,14 +95,76 @@ pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn s
     }
 
     spawn_api(config.api_port, state).await;
+    spawn_state_saver(persisted.clone(), wal.clone(), layout.state_dir());
 
     tracing::info!(target: "system", "Agent running");
     crate::shutdown::wait_for_shutdown().await;
 
     tracing::info!(target: "system", "Shutting down");
-    let w = wal.lock().await;
-    let _ = w.save_meta();
+    {
+        let w = wal.lock().await;
+        let _ = w.save_meta();
+    }
+    {
+        let mut ps = persisted.lock().await;
+        let w = wal.lock().await;
+        ps.update_seq(w.next_id());
+        ps.record_shutdown();
+        let _ = ps.save(&layout.state_dir());
+    }
 
+    Ok(())
+}
+
+fn load_or_create_persisted_state(
+    layout: &VolumeLayout,
+    agent_id: &str,
+    server_url: &str,
+    resume_seq: u64,
+) -> Result<AgentPersistedState, Box<dyn std::error::Error>> {
+    let state_dir = layout.state_dir();
+    let _ = std::fs::create_dir_all(&state_dir);
+
+    let mut state = match AgentPersistedState::load(&state_dir)? {
+        Some(mut s) => {
+            let clean = s.clean_shutdown;
+            if !clean {
+                tracing::warn!(target: "boot", "Previous shutdown was not clean (crash detected)");
+            }
+            s.record_boot();
+            s
+        }
+        None => {
+            tracing::info!(target: "boot", "First boot, creating agent state");
+            let mut s = AgentPersistedState::new(agent_id.into(), server_url.into());
+            s.record_boot();
+            s
+        }
+    };
+
+    state.update_seq(resume_seq);
+    state.save(&state_dir)?;
+
+    tracing::info!(
+        target: "boot",
+        agent_id = %state.agent_id,
+        boot_count = state.boot_count,
+        seq = state.seq_counter,
+        "Agent state loaded"
+    );
+
+    Ok(state)
+}
+
+fn run_compaction_if_needed(wal_dir: &str, wal: &Wal) -> Result<(), Box<dyn std::error::Error>> {
+    let threshold = COMPACTION_THRESHOLD_MB * 1024 * 1024;
+    let dir = Path::new(wal_dir);
+    if needs_compaction(dir, threshold)? {
+        tracing::info!(target: "boot", "WAL compaction needed, running");
+        let meta = wal.save_meta()?;
+        compact(dir, &meta)?;
+        tracing::info!(target: "boot", "WAL compaction complete");
+    }
     Ok(())
 }
 
@@ -93,9 +182,10 @@ fn spawn_batcher(
     agent_id: String,
     wal: Arc<Mutex<Wal>>,
     mut rx: mpsc::Receiver<Vec<sentinel_common::proto::Metric>>,
+    resume_seq: u64,
 ) {
     tokio::spawn(async move {
-        let mut composer = BatchComposer::new(agent_id, 0);
+        let mut composer = BatchComposer::new(agent_id, resume_seq);
         while let Some(metrics) = rx.recv().await {
             let batch = composer.compose(metrics);
             let encoded = BatchComposer::encode_batch(&batch);
@@ -191,6 +281,28 @@ async fn spawn_api(port: u16, state: AgentState) {
             }
             Err(e) => {
                 tracing::error!(target: "net", error = %e, addr = %addr, "Failed to bind HTTP API")
+            }
+        }
+    });
+}
+
+fn spawn_state_saver(
+    persisted: Arc<Mutex<AgentPersistedState>>,
+    wal: Arc<Mutex<Wal>>,
+    state_dir: std::path::PathBuf,
+) {
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(STATE_SAVE_INTERVAL_SECS)).await;
+            let w = wal.lock().await;
+            let seq = w.next_id();
+            let _ = w.save_meta();
+            drop(w);
+
+            let mut ps = persisted.lock().await;
+            ps.update_seq(seq);
+            if let Err(e) = ps.save(&state_dir) {
+                tracing::warn!(target: "system", error = %e, "Failed to save agent state");
             }
         }
     });

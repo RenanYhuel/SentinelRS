@@ -2,16 +2,17 @@ use tokio_stream::StreamExt;
 use tonic::Streaming;
 
 use sentinel_common::proto::{
-    server_message::Payload as ServerPayload, BatchAckStatus, ServerMessage,
+    server_message::Payload as ServerPayload, Batch, BatchAckStatus, ServerMessage,
 };
 
 use crate::buffer::Wal;
+use prost::Message;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub async fn receive_loop(
     mut inbound: Streaming<ServerMessage>,
-    _wal: Arc<Mutex<Wal>>,
+    wal: Arc<Mutex<Wal>>,
 ) -> Result<(), RecvError> {
     while let Some(result) = inbound.next().await {
         let msg = result.map_err(|e| RecvError::Transport(e.to_string()))?;
@@ -24,6 +25,7 @@ pub async fn receive_loop(
                 match status {
                     BatchAckStatus::BatchAccepted => {
                         tracing::debug!(target: "data", batch_id = %ack.batch_id, "Batch acknowledged");
+                        ack_batch_in_wal(&wal, &ack.batch_id).await;
                     }
                     BatchAckStatus::BatchRejected => {
                         tracing::warn!(target: "data", batch_id = %ack.batch_id, reason = %ack.message, "Batch rejected");
@@ -87,4 +89,20 @@ fn current_time_ms() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64
+}
+
+async fn ack_batch_in_wal(wal: &Arc<Mutex<Wal>>, batch_id: &str) {
+    let mut w = wal.lock().await;
+    if let Ok(unacked) = w.iter_unacked() {
+        for (record_id, data) in unacked {
+            if let Ok(batch) = Batch::decode(data.as_slice()) {
+                if batch.batch_id == batch_id {
+                    w.ack(record_id);
+                    tracing::trace!(target: "data", record_id, batch_id, "WAL record acked");
+                    return;
+                }
+            }
+        }
+    }
+    tracing::trace!(target: "data", batch_id, "Batch not found in WAL for ack");
 }

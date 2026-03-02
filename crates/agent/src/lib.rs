@@ -8,6 +8,7 @@ pub mod cli;
 pub mod collector;
 pub mod config;
 pub mod exporter;
+pub mod persistence;
 pub mod plugin;
 pub mod run;
 pub mod scheduler;

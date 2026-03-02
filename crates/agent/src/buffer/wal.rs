@@ -136,6 +136,10 @@ impl Wal {
         &self.dir
     }
 
+    pub fn next_id(&self) -> u64 {
+        self.next_id
+    }
+
     fn head_seq(&self) -> u64 {
         if self.acked.is_empty() {
             return 0;
