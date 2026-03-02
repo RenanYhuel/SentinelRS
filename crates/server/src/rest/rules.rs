@@ -125,6 +125,13 @@ pub async fn create_rule(
         updated_at_ms: now_ms,
     };
 
+    if let Some(ref repo) = state.rule_repo {
+        repo.insert(&record).await.map_err(|e| {
+            tracing::error!(target: "rest", error = %e, "rule insert failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    }
+
     let resp = to_response(record.clone());
     state.rules.insert(record);
     Ok((StatusCode::CREATED, Json(resp)))
@@ -168,11 +175,24 @@ pub async fn update_rule(
         updated_at_ms: now_ms,
     };
 
+    if let Some(ref repo) = state.rule_repo {
+        repo.update(&updated).await.map_err(|e| {
+            tracing::error!(target: "rest", error = %e, "rule update failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    }
+
     state.rules.update(updated.clone());
     Ok(Json(to_response(updated)))
 }
 
 pub async fn delete_rule(State(state): State<AppState>, Path(rule_id): Path<String>) -> StatusCode {
+    if let Some(ref repo) = state.rule_repo {
+        if let Err(e) = repo.delete(&rule_id).await {
+            tracing::error!(target: "rest", error = %e, "rule delete failed");
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    }
     if state.rules.delete(&rule_id) {
         StatusCode::NO_CONTENT
     } else {

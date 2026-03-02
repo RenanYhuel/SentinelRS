@@ -4,6 +4,7 @@ use std::time::Instant;
 use sentinel_common::proto::Batch;
 use sqlx::PgPool;
 
+use super::alert_engine::AlertEngine;
 use crate::metrics::worker_metrics::WorkerMetrics;
 use crate::storage::{write_with_retry, AgentRepo, MetricWriter};
 use crate::transform::transform_batch;
@@ -16,6 +17,7 @@ pub struct IngestPipeline {
     writer: MetricWriter,
     agent_repo: AgentRepo,
     metrics: Arc<WorkerMetrics>,
+    alert_engine: Option<Arc<AlertEngine>>,
 }
 
 impl IngestPipeline {
@@ -24,7 +26,13 @@ impl IngestPipeline {
             writer: MetricWriter::new(pool.clone()),
             agent_repo: AgentRepo::new(pool),
             metrics,
+            alert_engine: None,
         }
+    }
+
+    pub fn with_alert_engine(mut self, engine: Arc<AlertEngine>) -> Self {
+        self.alert_engine = Some(engine);
+        self
     }
 
     pub async fn ingest(&self, batch: &Batch) -> Result<(), BoxError> {
@@ -42,6 +50,10 @@ impl IngestPipeline {
         self.metrics.add_rows_inserted(inserted);
 
         self.agent_repo.touch_last_seen(&batch.agent_id).await?;
+
+        if let Some(ref engine) = self.alert_engine {
+            engine.process(&batch.agent_id, &rows).await;
+        }
 
         self.metrics.inc_batches_processed();
         self.metrics.record_processing_latency(start);
