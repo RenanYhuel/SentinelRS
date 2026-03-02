@@ -42,12 +42,6 @@ impl Record {
     }
 }
 
-impl Record {
-    pub fn encoded_size(&self) -> usize {
-        4 + 8 + self.data.len() + 4
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

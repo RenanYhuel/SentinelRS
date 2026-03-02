@@ -95,10 +95,6 @@ impl ApiClient {
             .unwrap_or(false)
     }
 
-    pub fn base_url(&self) -> &str {
-        &self.base_url
-    }
-
     pub fn streaming_client(&self) -> &reqwest::Client {
         &self.http
     }

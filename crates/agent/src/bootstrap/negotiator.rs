@@ -14,8 +14,6 @@ const BOOTSTRAP_TIMEOUT_SECS: u64 = 30;
 
 pub struct BootstrapResult {
     pub agent_id: String,
-    pub secret: String,
-    pub key_id: String,
     pub config_yaml: Vec<u8>,
 }
 
@@ -71,8 +69,6 @@ pub async fn negotiate(
             match status {
                 BootstrapStatus::BootstrapOk => Ok(BootstrapResult {
                     agent_id: resp.agent_id,
-                    secret: resp.secret,
-                    key_id: resp.key_id,
                     config_yaml: resp.config_yaml,
                 }),
                 BootstrapStatus::BootstrapInvalidToken => {
