@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/ap
 WORKDIR /build
 
 COPY Cargo.toml Cargo.toml
+COPY migrations migrations
 COPY crates/common crates/common
 COPY crates/server crates/server
 
