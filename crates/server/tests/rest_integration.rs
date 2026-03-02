@@ -36,7 +36,6 @@ fn seed_agent(state: &AppState) {
         registered_at_ms: 1_700_000_000_000,
         deprecated_keys: Vec::new(),
         last_seen: None,
-        last_seen: None,
     });
 }
 
