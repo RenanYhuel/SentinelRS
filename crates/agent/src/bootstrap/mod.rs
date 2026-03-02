@@ -18,7 +18,7 @@ pub async fn run_if_needed(
         return Ok(None);
     }
 
-    tracing::info!("no config file found, entering bootstrap mode");
+    tracing::info!(target: "boot", "No config file found, entering bootstrap mode");
 
     let token = match bootstrap_token_from_env() {
         Some(t) => t,
@@ -36,13 +36,14 @@ pub async fn run_if_needed(
 
     let hw_id = sysinfo::System::host_name().unwrap_or_else(|| "unknown-hw".into());
 
-    tracing::info!(server = %server_url, hw_id = %hw_id, "negotiating bootstrap");
+    tracing::info!(target: "boot", server = %server_url, hw_id = %hw_id, "Negotiating bootstrap");
 
     let result = negotiator::negotiate(&server_url, &token, &hw_id).await?;
 
     tracing::info!(
+        target: "boot",
         agent_id = %result.agent_id,
-        "bootstrap successful, writing config"
+        "Bootstrap successful, writing config"
     );
 
     let config_dir = config_path
@@ -54,7 +55,7 @@ pub async fn run_if_needed(
     cleanup::scrub_token_from_env();
 
     let written_path = config_dir.join(CONFIG_FILE_NAME);
-    tracing::info!(path = %written_path.display(), "agent provisioned, reloading config");
+    tracing::info!(target: "boot", path = %written_path.display(), "Agent provisioned, reloading config");
 
     Ok(Some(written_path))
 }

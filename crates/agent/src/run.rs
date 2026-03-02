@@ -30,11 +30,12 @@ pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn s
         "stream (V2)"
     };
     tracing::info!(
+        target: "cfg",
         agent_id = %agent_id,
         server = %config.server,
         interval_s = config.collect.interval_seconds,
         mode = mode_label,
-        "agent configured"
+        "Agent configured"
     );
 
     let segment_bytes = config.buffer.segment_size_mb * 1024 * 1024;
@@ -68,10 +69,10 @@ pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn s
 
     spawn_api(config.api_port, state).await;
 
-    tracing::info!("agent running");
+    tracing::info!(target: "system", "Agent running");
     crate::shutdown::wait_for_shutdown().await;
 
-    tracing::info!("shutting down");
+    tracing::info!(target: "system", "Shutting down");
     let w = wal.lock().await;
     let _ = w.save_meta();
 
@@ -121,7 +122,7 @@ fn spawn_legacy_sender(
         loop {
             match GrpcClient::connect(&server, agent_id.clone(), &secret, None).await {
                 Ok(mut client) => {
-                    tracing::info!("connected to server");
+                    tracing::info!(target: "net", "Connected to server");
                     state.set_ready(true);
 
                     loop {
@@ -136,7 +137,7 @@ fn spawn_legacy_sender(
                             }
                             Ok(_) => {}
                             Err(e) => {
-                                tracing::warn!(error = %e, "send failed, will reconnect");
+                                tracing::warn!(target: "net", error = %e, "Send failed, will reconnect");
                                 state.increment_batches_failed();
                                 break;
                             }
@@ -144,7 +145,7 @@ fn spawn_legacy_sender(
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "server unreachable, retrying in 10s");
+                    tracing::warn!(target: "net", error = %e, "Server unreachable, retrying in 10s");
                     state.set_ready(false);
                 }
             }
@@ -183,12 +184,14 @@ async fn spawn_api(port: u16, state: AgentState) {
     tokio::spawn(async move {
         match TcpListener::bind(&addr).await {
             Ok(listener) => {
-                tracing::info!(addr = %addr, "HTTP API listening");
+                tracing::info!(target: "net", addr = %addr, "HTTP API listening");
                 if let Err(e) = api::serve(listener, state).await {
-                    tracing::error!(error = %e, "HTTP API error");
+                    tracing::error!(target: "net", error = %e, "HTTP API error");
                 }
             }
-            Err(e) => tracing::error!(error = %e, addr = %addr, "failed to bind HTTP API"),
+            Err(e) => {
+                tracing::error!(target: "net", error = %e, addr = %addr, "Failed to bind HTTP API")
+            }
         }
     });
 }
@@ -203,6 +206,6 @@ fn resolve_secret(config: &AgentConfig) -> Result<Vec<u8>, Box<dyn std::error::E
     if let Ok(val) = std::env::var("SENTINEL_MASTER_KEY") {
         return Ok(val.into_bytes());
     }
-    tracing::warn!("no secret configured, HMAC signing will use an empty key");
+    tracing::warn!(target: "auth", "No secret configured, HMAC signing will use an empty key");
     Ok(Vec::new())
 }

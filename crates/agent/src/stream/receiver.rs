@@ -23,13 +23,13 @@ pub async fn receive_loop(
 
                 match status {
                     BatchAckStatus::BatchAccepted => {
-                        tracing::debug!(batch_id = %ack.batch_id, "batch acknowledged");
+                        tracing::debug!(target: "data", batch_id = %ack.batch_id, "Batch acknowledged");
                     }
                     BatchAckStatus::BatchRejected => {
-                        tracing::warn!(batch_id = %ack.batch_id, reason = %ack.message, "batch rejected");
+                        tracing::warn!(target: "data", batch_id = %ack.batch_id, reason = %ack.message, "Batch rejected");
                     }
                     BatchAckStatus::BatchRetry => {
-                        tracing::warn!(batch_id = %ack.batch_id, "batch retry requested");
+                        tracing::warn!(target: "data", batch_id = %ack.batch_id, "Batch retry requested");
                     }
                 }
             }
@@ -38,17 +38,17 @@ pub async fn receive_loop(
                 tracing::trace!(latency_ms = latency, "heartbeat pong");
             }
             Some(ServerPayload::ConfigUpdate(update)) => {
-                tracing::info!(version = update.version, "config update received");
+                tracing::info!(target: "cfg", version = update.version, "Config update received");
             }
             Some(ServerPayload::Command(cmd)) => {
-                tracing::info!(command_id = %cmd.command_id, "remote command received");
+                tracing::info!(target: "system", command_id = %cmd.command_id, "Remote command received");
             }
             Some(ServerPayload::Error(err)) => {
                 if err.fatal {
-                    tracing::error!(code = err.code, message = %err.message, "fatal server error");
+                    tracing::error!(target: "conn", code = err.code, message = %err.message, "Fatal server error");
                     return Err(RecvError::FatalServerError(err.message));
                 }
-                tracing::warn!(code = err.code, message = %err.message, "server error");
+                tracing::warn!(target: "conn", code = err.code, message = %err.message, "Server error");
             }
             Some(ServerPayload::HandshakeAck(_)) => {
                 tracing::warn!("unexpected handshake ack on active stream");

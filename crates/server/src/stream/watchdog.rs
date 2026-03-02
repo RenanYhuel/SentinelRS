@@ -42,10 +42,11 @@ async fn run_watchdog(registry: SessionRegistry, events: PresenceEventBus, confi
     let evict_threshold_ms = config.heartbeat_interval_ms * config.evict_multiplier;
 
     tracing::info!(
+        target: "conn",
         check_interval_ms = config.check_interval.as_millis() as u64,
         stale_after_ms = stale_threshold_ms,
         evict_after_ms = evict_threshold_ms,
-        "watchdog started"
+        "Watchdog started"
     );
 
     let mut interval = tokio::time::interval(config.check_interval);
@@ -63,9 +64,10 @@ async fn run_watchdog(registry: SessionRegistry, events: PresenceEventBus, confi
                     at: Utc::now(),
                 });
                 tracing::warn!(
+                    target: "conn",
                     agent_id = %agent_id,
                     last_ping_ms_ago = ms_ago,
-                    "agent stale"
+                    "Agent stale"
                 );
             }
         }
@@ -79,8 +81,9 @@ async fn run_watchdog(registry: SessionRegistry, events: PresenceEventBus, confi
                 at: Utc::now(),
             });
             tracing::error!(
+                target: "conn",
                 agent_id = %agent_id,
-                "agent evicted — connection lost (no heartbeat)"
+                "Agent evicted — connection lost (no heartbeat)"
             );
         }
     }

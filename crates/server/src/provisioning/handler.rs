@@ -62,7 +62,7 @@ pub async fn handle_bootstrap(
 
     if let Some(repo) = agent_repo {
         if let Err(e) = repo.upsert(&record).await {
-            tracing::error!(error = %e, agent_id = %agent_id, "failed to persist bootstrapped agent");
+            tracing::error!(target: "auth", error = %e, agent_id = %agent_id, "Failed to persist bootstrapped agent");
         }
     }
 
@@ -70,10 +70,11 @@ pub async fn handle_bootstrap(
     let config_yaml = build_agent_config_yaml(&agent_id, &secret_b64, server_url);
 
     tracing::info!(
+        target: "auth",
         agent_id = %agent_id,
         hw_id = %hw_id,
         token_name = %entry.agent_name,
-        "agent bootstrapped via zero-touch provisioning"
+        "Agent bootstrapped via zero-touch provisioning"
     );
 
     BootstrapOutcome {

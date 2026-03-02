@@ -56,16 +56,16 @@ impl StreamClient {
         loop {
             match self.connect_and_run().await {
                 Ok(()) => {
-                    tracing::info!("stream closed gracefully");
+                    tracing::info!(target: "conn", "Stream closed gracefully");
                     attempt = 0;
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, attempt, "stream connection failed");
+                    tracing::warn!(target: "conn", error = %e, attempt, "Stream connection failed");
                 }
             }
 
             let delay = self.reconnect.delay_for_attempt(attempt);
-            tracing::info!(delay_ms = delay.as_millis() as u64, "reconnecting");
+            tracing::info!(target: "conn", delay_ms = delay.as_millis() as u64, "Reconnecting");
             tokio::time::sleep(delay).await;
             attempt = attempt.saturating_add(1);
         }
@@ -114,9 +114,10 @@ impl StreamClient {
             .map_err(|e| ConnectionError::Handshake(e.to_string()))?;
 
         tracing::info!(
+            target: "conn",
             agent_id = %self.agent_id,
             heartbeat_interval_ms,
-            "stream authenticated"
+            "Stream authenticated"
         );
 
         let sender = StreamSender::new(

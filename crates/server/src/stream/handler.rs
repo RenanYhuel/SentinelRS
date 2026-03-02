@@ -116,7 +116,7 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
             )
             .await
             {
-                tracing::debug!(error = %e, "stream ended");
+                tracing::debug!(target: "conn", error = %e, "Stream ended");
             }
         });
 
@@ -150,7 +150,7 @@ async fn run_stream<B: BrokerPublisher>(
     )
     .await?;
 
-    tracing::info!(agent_id = %agent_id, "stream authenticated");
+    tracing::info!(target: "conn", agent_id = %agent_id, "Stream authenticated");
 
     let version = registry
         .snapshot(&agent_id)
@@ -197,7 +197,7 @@ async fn run_stream<B: BrokerPublisher>(
         at: Utc::now(),
     });
 
-    tracing::info!(agent_id = %agent_id, "stream disconnected");
+    tracing::info!(target: "conn", agent_id = %agent_id, "Stream disconnected");
 
     result
 }
@@ -300,7 +300,7 @@ async fn complete_handshake(
         AuthOutcome::Authenticated(auth) => {
             if registry.contains(&auth.agent_id) {
                 registry.unregister(&auth.agent_id);
-                tracing::warn!(agent_id = %auth.agent_id, "evicted stale session for reconnecting agent");
+                tracing::warn!(target: "conn", agent_id = %auth.agent_id, "Evicted stale session for reconnecting agent");
             }
 
             let session = Session::new(
