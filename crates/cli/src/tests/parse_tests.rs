@@ -26,7 +26,6 @@ mod tests {
     fn parse_human_flag_default() {
         let opts = parse(&["version"]);
         assert!(!opts.json);
-        assert_eq!(opts.output_mode(), crate::output::OutputMode::Human);
     }
 
     #[test]
@@ -39,6 +38,24 @@ mod tests {
     fn parse_config_flag() {
         let opts = parse(&["--config", "/tmp/agent.yml", "version"]);
         assert_eq!(opts.config.as_deref(), Some("/tmp/agent.yml"));
+    }
+
+    #[test]
+    fn parse_init() {
+        let opts = parse(&["init"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Init));
+    }
+
+    #[test]
+    fn parse_doctor() {
+        let opts = parse(&["doctor"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Doctor));
+    }
+
+    #[test]
+    fn parse_completions() {
+        let opts = parse(&["completions", "bash"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Completions { .. }));
     }
 
     #[test]
@@ -66,6 +83,18 @@ mod tests {
     }
 
     #[test]
+    fn parse_wal_compact() {
+        let opts = parse(&["wal", "compact", "--force", "--yes"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Wal(_)));
+    }
+
+    #[test]
+    fn parse_wal_meta() {
+        let opts = parse(&["wal", "meta"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Wal(_)));
+    }
+
+    #[test]
     fn parse_agents_list() {
         let opts = parse(&["agents", "list"]);
         assert!(matches!(opts.cmd, crate::cmd::Commands::Agents(_)));
@@ -75,6 +104,42 @@ mod tests {
     fn parse_agents_get() {
         let opts = parse(&["agents", "get", "agent-123"]);
         assert!(matches!(opts.cmd, crate::cmd::Commands::Agents(_)));
+    }
+
+    #[test]
+    fn parse_agents_live() {
+        let opts = parse(&["agents", "live", "agent-123"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Agents(_)));
+    }
+
+    #[test]
+    fn parse_agents_delete() {
+        let opts = parse(&["agents", "delete", "agent-123", "--yes"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Agents(_)));
+    }
+
+    #[test]
+    fn parse_agents_generate_install() {
+        let opts = parse(&["agents", "generate-install"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Agents(_)));
+    }
+
+    #[test]
+    fn parse_cluster_status() {
+        let opts = parse(&["cluster", "status"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Cluster(_)));
+    }
+
+    #[test]
+    fn parse_cluster_agents() {
+        let opts = parse(&["cluster", "agents"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Cluster(_)));
+    }
+
+    #[test]
+    fn parse_cluster_watch() {
+        let opts = parse(&["cluster", "watch"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Cluster(_)));
     }
 
     #[test]
@@ -123,25 +188,49 @@ mod tests {
     #[test]
     fn parse_health() {
         let opts = parse(&["health"]);
-        assert!(matches!(opts.cmd, crate::cmd::Commands::Health(_)));
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Health));
     }
 
     #[test]
     fn parse_status() {
         let opts = parse(&["status"]);
-        assert!(matches!(opts.cmd, crate::cmd::Commands::Status(_)));
-    }
-
-    #[test]
-    fn parse_tail_logs() {
-        let opts = parse(&["tail-logs", "--lines", "50"]);
-        assert!(matches!(opts.cmd, crate::cmd::Commands::TailLogs(_)));
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Status));
     }
 
     #[test]
     fn parse_force_send() {
         let opts = parse(&["force-send", "--limit", "10"]);
         assert!(matches!(opts.cmd, crate::cmd::Commands::ForceSend(_)));
+    }
+
+    #[test]
+    fn parse_metrics_show() {
+        let opts = parse(&["metrics", "show"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Metrics(_)));
+    }
+
+    #[test]
+    fn parse_metrics_live() {
+        let opts = parse(&["metrics", "live", "--interval", "5"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Metrics(_)));
+    }
+
+    #[test]
+    fn parse_config_edit() {
+        let opts = parse(&["config", "edit"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Config(_)));
+    }
+
+    #[test]
+    fn parse_config_path() {
+        let opts = parse(&["config", "path"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Config(_)));
+    }
+
+    #[test]
+    fn parse_config_reset() {
+        let opts = parse(&["config", "reset"]);
+        assert!(matches!(opts.cmd, crate::cmd::Commands::Config(_)));
     }
 
     #[test]

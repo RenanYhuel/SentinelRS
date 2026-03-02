@@ -2,42 +2,36 @@ use anyhow::{Context, Result};
 use clap::Args;
 use tonic::transport::Channel;
 
-use crate::output::{print_info, print_json, spinner, theme, OutputMode};
+use crate::output::{input, print_info, print_json, spinner, theme, OutputMode};
 use sentinel_common::proto::agent_service_client::AgentServiceClient;
 use sentinel_common::proto::RegisterRequest;
 
 #[derive(Args)]
 pub struct RegisterArgs {
-    #[arg(long, help = "Hardware ID for this agent")]
-    hw_id: String,
+    #[arg(long)]
+    hw_id: Option<String>,
 
-    #[arg(long, default_value = env!("CARGO_PKG_VERSION"), help = "Agent version")]
+    #[arg(long, default_value = env!("CARGO_PKG_VERSION"))]
     agent_version: String,
 
-    #[arg(long, help = "Save credentials to config directory")]
+    #[arg(long)]
     save: bool,
 }
 
-#[derive(serde::Serialize)]
-struct RegisterOutput {
-    agent_id: String,
-    secret: String,
-}
+pub async fn run(args: RegisterArgs, mode: OutputMode, server: Option<String>) -> Result<()> {
+    let hw_id = match args.hw_id {
+        Some(id) => id,
+        None => input::text_required("Hardware ID")?,
+    };
 
-pub async fn execute(
-    args: RegisterArgs,
-    mode: OutputMode,
-    server: Option<String>,
-    config_path: Option<String>,
-) -> Result<()> {
-    let endpoint = super::helpers::resolve_server(server.as_deref(), config_path.as_deref())?;
+    let url = resolve_grpc_endpoint(server.as_deref())?;
 
     let sp = match mode {
         OutputMode::Human => Some(spinner::create("Connecting to server...")),
         OutputMode::Json => None,
     };
 
-    let channel = Channel::from_shared(endpoint.clone())
+    let channel = Channel::from_shared(url)
         .context("invalid endpoint")?
         .connect()
         .await
@@ -47,21 +41,16 @@ pub async fn execute(
         sp.set_message("Registering agent...");
     }
 
-    let mut client = AgentServiceClient::new(channel);
+    let mut grpc = AgentServiceClient::new(channel);
 
-    let response = client
+    let response = grpc
         .register(RegisterRequest {
-            hw_id: args.hw_id.clone(),
+            hw_id: hw_id.clone(),
             agent_version: args.agent_version.clone(),
         })
         .await
         .context("register RPC failed")?
         .into_inner();
-
-    let out = RegisterOutput {
-        agent_id: response.agent_id.clone(),
-        secret: response.secret.clone(),
-    };
 
     if args.save {
         save_credentials(&response.agent_id, &response.secret)?;
@@ -72,11 +61,14 @@ pub async fn execute(
     }
 
     match mode {
-        OutputMode::Json => print_json(&out)?,
+        OutputMode::Json => print_json(&serde_json::json!({
+            "agent_id": response.agent_id,
+            "secret": response.secret,
+        }))?,
         OutputMode::Human => {
             theme::print_section("Credentials");
-            theme::print_kv("Agent ID", &out.agent_id);
-            theme::print_kv("Secret", &out.secret);
+            theme::print_kv("Agent ID", &response.agent_id);
+            theme::print_kv("Secret", &response.secret);
             if args.save {
                 println!();
                 print_info("Saved", "credentials stored locally");
@@ -85,6 +77,21 @@ pub async fn execute(
     }
 
     Ok(())
+}
+
+fn resolve_grpc_endpoint(server: Option<&str>) -> Result<String> {
+    if let Some(s) = server {
+        return Ok(s.to_string());
+    }
+    if let Ok(cfg) = crate::store::load() {
+        let mut url = cfg.server_url.clone();
+        if !url.starts_with("http") {
+            url = format!("http://{url}");
+        }
+        return Ok(url);
+    }
+    let url = input::text("gRPC endpoint", "http://localhost:50051")?;
+    Ok(url)
 }
 
 fn save_credentials(agent_id: &str, secret: &str) -> Result<()> {

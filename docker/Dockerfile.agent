@@ -1,0 +1,56 @@
+FROM rust:1.85-bookworm AS builder
+
+RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY Cargo.toml Cargo.toml
+COPY crates/common crates/common
+COPY crates/agent crates/agent
+
+RUN mkdir -p crates/server/src crates/workers/src crates/cli/src \
+    && echo "fn main() {}" > crates/server/src/main.rs \
+    && echo "" > crates/server/src/lib.rs \
+    && echo "fn main() {}" > crates/workers/src/main.rs \
+    && echo "" > crates/workers/src/lib.rs \
+    && echo "fn main() {}" > crates/cli/src/main.rs
+
+COPY crates/server/Cargo.toml crates/server/Cargo.toml
+COPY crates/workers/Cargo.toml crates/workers/Cargo.toml
+COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
+
+RUN cargo build --release --package sentinel_agent 2>/dev/null || true
+
+COPY crates/agent crates/agent
+
+RUN cargo build --release --package sentinel_agent
+
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r sentinel && useradd -r -g sentinel -s /sbin/nologin sentinel
+
+COPY --from=builder /build/target/release/sentinel_agent /usr/local/bin/sentinel_agent
+
+RUN chmod +x /usr/local/bin/sentinel_agent
+
+RUN mkdir -p /etc/sentinel && chown sentinel:sentinel /etc/sentinel
+
+USER sentinel
+
+VOLUME ["/etc/sentinel"]
+
+EXPOSE 9090
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:9090/healthz || exit 1
+
+LABEL org.opencontainers.image.title="SentinelRS Agent" \
+      org.opencontainers.image.description="SentinelRS lightweight monitoring agent — metrics collector" \
+      org.opencontainers.image.vendor="SentinelRS" \
+      org.opencontainers.image.source="https://github.com/sentinelrs/sentinelrs"
+
+ENTRYPOINT ["sentinel_agent"]

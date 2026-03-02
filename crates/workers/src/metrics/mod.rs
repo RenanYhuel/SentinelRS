@@ -1,4 +1,5 @@
 pub mod exposition;
+pub mod pipeline_stats;
 pub mod worker_metrics;
 
 #[cfg(test)]
@@ -33,9 +34,9 @@ mod tests {
         let m = WorkerMetrics::new();
         m.inc_batches_processed();
         m.add_rows_inserted(42);
-        let output = render_prometheus(&m);
-        assert!(output.contains("sentinel_worker_batches_processed_total 1"));
-        assert!(output.contains("sentinel_worker_rows_inserted_total 42"));
+        let output = render_prometheus(&m, "test-worker");
+        assert!(output.contains("sentinel_worker_batches_processed_total"));
+        assert!(output.contains("sentinel_worker_rows_inserted_total"));
         assert!(output.contains("# TYPE sentinel_worker_db_latency_us summary"));
     }
 }

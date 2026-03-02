@@ -1,10 +1,12 @@
 pub mod banner;
+pub mod bar_chart;
 pub mod confirm;
-mod format;
+pub mod format;
+pub mod input;
 pub mod progress;
 pub mod select;
 pub mod spinner;
-mod table;
+pub mod table;
 pub mod theme;
 pub mod time_ago;
 

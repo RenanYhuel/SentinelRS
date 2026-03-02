@@ -46,12 +46,9 @@ impl Segment {
         Ok(records)
     }
 
+    #[allow(dead_code)]
     pub fn path(&self) -> &Path {
         &self.path
-    }
-
-    pub fn count(&self) -> usize {
-        self.count
     }
 
     pub fn size_bytes(&self) -> io::Result<u64> {

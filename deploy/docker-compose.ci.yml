@@ -1,0 +1,93 @@
+services:
+    timescaledb:
+        image: timescale/timescaledb:latest-pg14
+        environment:
+            POSTGRES_USER: sentinel
+            POSTGRES_PASSWORD: sentinel_ci
+            POSTGRES_DB: sentinel_test
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel_test"]
+            interval: 3s
+            timeout: 2s
+            retries: 15
+        networks:
+            - ci-net
+        tmpfs:
+            - /var/lib/postgresql/data
+
+    nats:
+        image: nats:2.10
+        command: ["--jetstream", "--store_dir=/tmp/nats"]
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "wget",
+                    "--spider",
+                    "-q",
+                    "http://localhost:8222/healthz",
+                ]
+            interval: 3s
+            timeout: 2s
+            retries: 15
+        networks:
+            - ci-net
+
+    sentinel-server:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile.server
+        depends_on:
+            timescaledb:
+                condition: service_healthy
+            nats:
+                condition: service_healthy
+        environment:
+            DATABASE_URL: postgres://sentinel:sentinel_ci@timescaledb:5432/sentinel_test
+            NATS_URL: nats://nats:4222
+            RUST_LOG: info
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+            start_period: 20s
+        networks:
+            - ci-net
+
+    sentinel-worker:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile.worker
+        depends_on:
+            sentinel-server:
+                condition: service_healthy
+        environment:
+            DATABASE_URL: postgres://sentinel:sentinel_ci@timescaledb:5432/sentinel_test
+            NATS_URL: nats://nats:4222
+            RUST_LOG: info
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+            start_period: 15s
+        networks:
+            - ci-net
+
+    sentinel-agent:
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile.agent
+        depends_on:
+            sentinel-server:
+                condition: service_healthy
+        environment:
+            SERVER_URL: http://sentinel-server:50051
+            RUST_LOG: info
+        networks:
+            - ci-net
+
+networks:
+    ci-net:
+        driver: bridge

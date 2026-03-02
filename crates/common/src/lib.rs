@@ -5,6 +5,7 @@ pub mod proto {
 pub mod batch_id;
 pub mod canonicalize;
 pub mod crypto;
+pub mod logging;
 pub mod metric_json;
 pub mod nats_config;
 pub mod retry;

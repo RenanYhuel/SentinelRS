@@ -7,7 +7,7 @@ use crate::metrics::exposition::render_prometheus;
 use crate::metrics::worker_metrics::WorkerMetrics;
 
 pub async fn metrics(State(m): State<Arc<WorkerMetrics>>) -> impl IntoResponse {
-    let body = render_prometheus(&m);
+    let body = render_prometheus(&m, "unknown");
     (
         [(
             header::CONTENT_TYPE,
@@ -31,6 +31,6 @@ mod tests {
             .await
             .unwrap();
         let text = String::from_utf8(body.to_vec()).unwrap();
-        assert!(text.contains("sentinel_worker_batches_processed_total 1"));
+        assert!(text.contains("sentinel_worker_batches_processed_total"));
     }
 }

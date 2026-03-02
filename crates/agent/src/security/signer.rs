@@ -5,6 +5,7 @@ use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
 
+#[derive(Clone)]
 pub struct HmacSigner {
     secret: Vec<u8>,
 }
@@ -14,6 +15,10 @@ impl HmacSigner {
         Self {
             secret: secret.to_vec(),
         }
+    }
+
+    pub fn secret_bytes(&self) -> Vec<u8> {
+        self.secret.clone()
     }
 
     pub fn sign(&self, data: &[u8]) -> Vec<u8> {

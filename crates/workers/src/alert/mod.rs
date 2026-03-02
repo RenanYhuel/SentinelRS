@@ -4,6 +4,7 @@ mod fingerprint;
 mod rule;
 mod state;
 mod store;
+#[cfg(test)]
 pub mod test_harness;
 
 pub use evaluator::Evaluator;

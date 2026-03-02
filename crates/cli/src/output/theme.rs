@@ -1,8 +1,7 @@
 use colored::Colorize;
 
 pub fn print_header(title: &str) {
-    let width = title.len() + 6;
-    let border = "─".repeat(width);
+    let border = "─".repeat(title.len() + 6);
     println!();
     println!("  ╭{}╮", border.cyan());
     println!("  │   {}   │", title.bright_cyan().bold());
@@ -33,16 +32,10 @@ pub fn print_kv_colored(label: &str, value: &str, ok: bool) {
     println!("    {} {}", format!("{:<16}", label).dimmed(), styled);
 }
 
-#[allow(dead_code)]
-pub fn print_warning(msg: &str) {
-    println!("{} {}", "⚠".yellow().bold(), msg.yellow());
-}
-
 pub fn print_dim(msg: &str) {
     println!("  {}", msg.dimmed());
 }
 
-#[allow(dead_code)]
 pub fn divider() {
     println!("  {}", "─".repeat(50).dimmed());
 }

@@ -1,48 +1,60 @@
 # Deployment
 
-## Quick Start (Docker Compose)
+## Docker Deployment (Recommended)
 
-The provided `deploy/docker-compose.yml` starts the required infrastructure:
+The full SentinelRS stack runs with a single command:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-This launches:
+This starts:
 
-| Service     | Image                               | Ports                            |
-| ----------- | ----------------------------------- | -------------------------------- |
-| NATS        | `nats:2.9.4`                        | 4222 (client), 8222 (monitoring) |
-| TimescaleDB | `timescale/timescaledb:latest-pg14` | 5432                             |
+| Service           | Image                               | Ports                            |
+| ----------------- | ----------------------------------- | -------------------------------- |
+| `timescaledb`     | `timescale/timescaledb:latest-pg14` | 5432                             |
+| `nats`            | `nats:2.10` (JetStream)             | 4222 (client), 8222 (monitoring) |
+| `sentinel-server` | `sentinelrs/server`                 | 50051 (gRPC), 8080 (REST)        |
+| `sentinel-worker` | `sentinelrs/worker`                 | 9091                             |
+| `sentinel-agent`  | `sentinelrs/agent` (profile: agent) | 9090                             |
 
-Default database credentials: `postgres` / `postgres`, database name: `sentinel`.
+Default credentials: `sentinel` / `sentinel_secret`, database: `sentinel`.
 
-## Database Setup
+Database migrations run automatically on server startup.
 
-### Apply Migrations
+> Full Docker guide: [docker.md](docker.md)
 
-Migrations are in `migrations/` and must be applied in order:
-
-```bash
-psql -h localhost -U postgres -d sentinel -f migrations/000_migration_tracking.sql
-psql -h localhost -U postgres -d sentinel -f migrations/001_create_extensions.sql
-psql -h localhost -U postgres -d sentinel -f migrations/002_create_metrics_time.sql
-psql -h localhost -U postgres -d sentinel -f migrations/003_create_metrics_raw.sql
-psql -h localhost -U postgres -d sentinel -f migrations/004_create_alerts.sql
-psql -h localhost -U postgres -d sentinel -f migrations/005_retention_policies.sql
-psql -h localhost -U postgres -d sentinel -f migrations/006_continuous_aggregates.sql
-psql -h localhost -U postgres -d sentinel -f migrations/007_dashboard_views.sql
-psql -h localhost -U postgres -d sentinel -f migrations/008_create_alert_rules.sql
-psql -h localhost -U postgres -d sentinel -f migrations/009_create_notifications_dlq.sql
-```
-
-Or apply all at once:
+### Scaling workers
 
 ```bash
-for f in migrations/*.sql; do psql -h localhost -U postgres -d sentinel -f "$f"; done
+docker compose -f deploy/docker-compose.yml up -d --scale sentinel-worker=3
 ```
 
-### Schema Overview
+Workers join the same NATS consumer group for automatic load balancing.
+
+### Deploying agents
+
+**Via compose profile:**
+
+```bash
+docker compose -f deploy/docker-compose.yml --profile agent up -d
+```
+
+**Standalone container with bootstrap:**
+
+```bash
+docker run -d \
+  -e SERVER_URL=https://server:50051 \
+  -e BOOTSTRAP_TOKEN=<token> \
+  -v sentinel-config:/etc/sentinel \
+  sentinelrs/agent:latest
+```
+
+> See [provisioning.md](provisioning.md) for the zero-touch provisioning flow.
+
+## Database
+
+Migrations run automatically when the server starts. The SQL files are in `migrations/` for reference or manual use.
 
 | Table               | Description                                                                  |
 | ------------------- | ---------------------------------------------------------------------------- |
@@ -53,7 +65,7 @@ for f in migrations/*.sql; do psql -h localhost -U postgres -d sentinel -f "$f";
 | `notifications_dlq` | Dead-letter queue for failed notifications                                   |
 | `mv_metrics_1h`     | Continuous aggregate — 1-hour rollups                                        |
 
-## Running the Binaries
+## Running the Binaries (native)
 
 ### Server
 
@@ -73,8 +85,8 @@ GRPC_PORT=9051 REST_PORT=3000 ./sentinel_server
 
 The server starts two listeners concurrently:
 
-- **gRPC** on `0.0.0.0:50051` (default) — agent registration, metric push, heartbeats
-- **REST** on `0.0.0.0:8080` (default) — admin API, health checks, Prometheus metrics
+- **gRPC** on `0.0.0.0:50051` (default) — V2 bidirectional streaming + V1 unary RPCs
+- **REST** on `0.0.0.0:8080` (default) — admin API, health checks, SSE events, Prometheus metrics
 
 Both ports are configurable via CLI flags (`--grpc-port`, `--rest-port`) or environment variables (`GRPC_PORT`, `REST_PORT`, `GRPC_ADDR`, `REST_ADDR`). CLI flags take precedence over env vars.
 
@@ -110,10 +122,13 @@ SENTINEL_MASTER_KEY="your-32-byte-key" ./sentinel_agent --config agent.yml
 
 The agent:
 
+- If no config file exists and `BOOTSTRAP_TOKEN` is set, enters zero-touch provisioning mode
 - Loads and validates the YAML config
+- Opens a persistent gRPC stream to the server (V2) with signed handshake
 - Starts periodic system metric collection (CPU, memory, disk)
-- Writes batches to the local WAL
-- Exports batches to the server via gRPC (with automatic retry and reconnection)
+- Writes batches to the local WAL, sends via stream with per-batch acknowledgement
+- Sends heartbeat pings with live system stats for presence tracking
+- Reconnects automatically with exponential backoff on disconnection
 - Exposes `/healthz`, `/ready` and `/metrics` on the configured `api_port` (default: 9090)
 - Shuts down gracefully on SIGTERM / SIGINT
 

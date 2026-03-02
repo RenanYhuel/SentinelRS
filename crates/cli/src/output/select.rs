@@ -10,11 +10,11 @@ pub fn select_option(prompt: &str, items: &[&str]) -> Option<usize> {
         .flatten()
 }
 
-#[allow(dead_code)]
-pub fn fuzzy_select(prompt: &str, items: &[&str]) -> Option<usize> {
+pub fn fuzzy_select(prompt: &str, items: &[String]) -> Option<usize> {
+    let refs: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
     FuzzySelect::with_theme(&ColorfulTheme::default())
         .with_prompt(prompt)
-        .items(items)
+        .items(&refs)
         .default(0)
         .interact_opt()
         .ok()

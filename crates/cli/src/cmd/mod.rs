@@ -1,60 +1,104 @@
 mod agents;
+mod cluster;
+mod completions;
 mod config;
+mod doctor;
 mod force_send;
 mod health;
-pub(crate) mod helpers;
+mod init;
 mod key;
+mod metrics;
 mod notifiers;
 mod register;
 mod rules;
 mod status;
-mod tail_logs;
 mod version;
-mod wal;
+pub(crate) mod wal;
 
 use anyhow::Result;
 use clap::Subcommand;
+use clap_complete::Shell;
 
 #[derive(Subcommand)]
 pub enum Commands {
-    Register(register::RegisterArgs),
-    #[command(subcommand)]
-    Config(config::ConfigCmd),
-    #[command(subcommand)]
-    Wal(wal::WalCmd),
-    ForceSend(force_send::ForceSendArgs),
-    #[command(subcommand)]
+    #[command(about = "Interactive setup wizard")]
+    Init,
+
+    #[command(about = "Run system diagnostics")]
+    Doctor,
+
+    #[command(about = "Generate shell completions")]
+    Completions {
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+
+    #[command(subcommand, about = "Manage registered agents")]
     Agents(agents::AgentsCmd),
-    #[command(subcommand)]
+
+    #[command(subcommand, about = "Cluster status and monitoring")]
+    Cluster(cluster::ClusterCmd),
+
+    #[command(subcommand, about = "CLI configuration")]
+    Config(config::ConfigCmd),
+
+    #[command(subcommand, about = "Alert rule management")]
     Rules(rules::RulesCmd),
-    #[command(subcommand)]
+
+    #[command(subcommand, about = "Notifier testing")]
     Notifiers(notifiers::NotifiersCmd),
-    #[command(subcommand)]
+
+    #[command(subcommand, about = "Encryption key management")]
     Key(key::KeyCmd),
-    Health(health::HealthArgs),
-    Status(status::StatusArgs),
-    TailLogs(tail_logs::TailLogsArgs),
+
+    #[command(subcommand, about = "WAL inspection and maintenance")]
+    Wal(wal::WalCmd),
+
+    #[command(subcommand, about = "Server metrics visualization")]
+    Metrics(metrics::MetricsCmd),
+
+    #[command(about = "Check server health")]
+    Health,
+
+    #[command(about = "Show agent and server status")]
+    Status,
+
+    #[command(about = "Register a new agent via gRPC")]
+    Register(register::RegisterArgs),
+
+    #[command(about = "Force-send unacked WAL batches")]
+    ForceSend(force_send::ForceSendArgs),
+
+    #[command(about = "Show CLI version")]
     Version,
 }
 
 pub async fn run(opts: crate::Opts) -> Result<()> {
     let mode = opts.output_mode();
     match opts.cmd {
-        Commands::Register(args) => register::execute(args, mode, opts.server, opts.config).await,
-        Commands::Config(cmd) => config::execute(cmd, mode, opts.config).await,
-        Commands::Wal(cmd) => wal::execute(cmd, mode, opts.config).await,
-        Commands::ForceSend(args) => {
-            force_send::execute(args, mode, opts.server, opts.config).await
-        }
-        Commands::Agents(cmd) => agents::execute(cmd, mode, opts.server, opts.config).await,
-        Commands::Rules(cmd) => rules::execute(cmd, mode, opts.server, opts.config).await,
+        Commands::Init => init::execute(mode).await,
+        Commands::Doctor => doctor::execute(mode, opts.server).await,
+        Commands::Completions { shell } => completions::execute(shell),
+        Commands::Agents(cmd) => agents::execute(cmd, mode, opts.server).await,
+        Commands::Cluster(cmd) => cluster::execute(cmd, mode, opts.server).await,
+        Commands::Config(cmd) => config::execute(cmd, mode).await,
+        Commands::Rules(cmd) => rules::execute(cmd, mode, opts.server).await,
         Commands::Notifiers(cmd) => notifiers::execute(cmd, mode, opts.server).await,
-        Commands::Key(cmd) => key::execute(cmd, mode, opts.config).await,
-        Commands::Health(args) => health::execute(args, mode, opts.server, opts.config).await,
-        Commands::Status(args) => status::execute(args, mode, opts.server, opts.config).await,
-        Commands::TailLogs(args) => tail_logs::execute(args).await,
+        Commands::Key(cmd) => {
+            key::execute(cmd, mode, opts.config)?;
+            Ok(())
+        }
+        Commands::Wal(cmd) => {
+            wal::execute(cmd, mode, opts.config)?;
+            Ok(())
+        }
+        Commands::Metrics(cmd) => metrics::execute(cmd, mode, opts.server).await,
+        Commands::Health => health::run(mode, opts.server).await,
+        Commands::Status => status::run(mode, opts.server, opts.config).await,
+        Commands::Register(args) => register::run(args, mode, opts.server).await,
+        Commands::ForceSend(args) => force_send::run(args, mode, opts.server, opts.config).await,
         Commands::Version => {
-            version::execute(mode);
+            version::run(mode);
             Ok(())
         }
     }
