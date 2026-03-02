@@ -64,6 +64,7 @@ services:
             NATS_URL: ${NATS_URL:-nats://nats:4222}
             SERVER_GRPC_PORT: ${SERVER_GRPC_PORT:-50051}
             SERVER_REST_PORT: ${SERVER_REST_PORT:-8080}
+            SERVER_GRPC_ADVERTISE_ADDR: ${SERVER_GRPC_ADVERTISE_ADDR:-http://sentinel-server:50051}
             RUST_LOG: ${SERVER_LOG_LEVEL:-info}
         ports:
             - "${SERVER_GRPC_PORT:-50051}:50051"

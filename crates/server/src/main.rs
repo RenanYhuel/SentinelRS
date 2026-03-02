@@ -102,7 +102,10 @@ async fn main() {
     let session_registry = SessionRegistry::new();
     let presence_events = PresenceEventBus::new();
     let token_store = TokenStore::new();
-    let grpc_public_url = format!("http://{}", config.grpc_addr);
+    let grpc_public_url = config
+        .grpc_advertise_addr
+        .clone()
+        .unwrap_or_else(|| format!("http://{}", config.grpc_addr));
 
     spawn_watchdog(
         session_registry.clone(),

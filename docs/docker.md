@@ -62,13 +62,14 @@ All services share a `sentinel-net` bridge network. Internal DNS resolution uses
 
 ### Server
 
-| Variable           | Default                                                         | Description            |
-| ------------------ | --------------------------------------------------------------- | ---------------------- |
-| `DATABASE_URL`     | `postgres://sentinel:sentinel_secret@timescaledb:5432/sentinel` | TimescaleDB connection |
-| `NATS_URL`         | `nats://nats:4222`                                              | NATS server            |
-| `SERVER_GRPC_PORT` | `50051`                                                         | gRPC listen port       |
-| `SERVER_REST_PORT` | `8080`                                                          | REST listen port       |
-| `RUST_LOG`         | `info`                                                          | Log level              |
+| Variable                     | Default                                                         | Description                      |
+| ---------------------------- | --------------------------------------------------------------- | -------------------------------- |
+| `DATABASE_URL`               | `postgres://sentinel:sentinel_secret@timescaledb:5432/sentinel` | TimescaleDB connection           |
+| `NATS_URL`                   | `nats://nats:4222`                                              | NATS server                      |
+| `SERVER_GRPC_PORT`           | `50051`                                                         | gRPC listen port                 |
+| `SERVER_REST_PORT`           | `8080`                                                          | REST listen port                 |
+| `SERVER_GRPC_ADVERTISE_ADDR` | —                                                               | Public gRPC URL for agent config |
+| `RUST_LOG`                   | `info`                                                          | Log level                        |
 
 ### Worker
 
