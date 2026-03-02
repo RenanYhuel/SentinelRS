@@ -9,10 +9,12 @@ use tonic::{Request, Response, Status, Streaming};
 use sentinel_common::proto::sentinel_stream_server::SentinelStream;
 use sentinel_common::proto::{
     agent_message::Payload as AgentPayload, server_message::Payload as ServerPayload, AgentMessage,
-    HandshakeAck, HandshakeStatus, ServerMessage,
+    BootstrapStatus, HandshakeAck, HandshakeStatus, ServerMessage,
 };
 
 use crate::broker::BrokerPublisher;
+use crate::persistence::AgentRepo;
+use crate::provisioning::{handle_bootstrap, TokenStore};
 use crate::store::{AgentStore, IdempotencyStore};
 
 use super::authenticator::{authenticate_handshake, AuthOutcome};
@@ -30,6 +32,9 @@ pub struct StreamService<B: BrokerPublisher> {
     broker: Arc<B>,
     registry: SessionRegistry,
     grace_period_ms: i64,
+    token_store: Option<TokenStore>,
+    agent_repo: Option<Arc<AgentRepo>>,
+    server_url: String,
 }
 
 impl<B: BrokerPublisher> StreamService<B> {
@@ -46,7 +51,22 @@ impl<B: BrokerPublisher> StreamService<B> {
             broker,
             registry,
             grace_period_ms,
+            token_store: None,
+            agent_repo: None,
+            server_url: String::new(),
         }
+    }
+
+    pub fn with_provisioning(
+        mut self,
+        token_store: TokenStore,
+        agent_repo: Option<Arc<AgentRepo>>,
+        server_url: String,
+    ) -> Self {
+        self.token_store = Some(token_store);
+        self.agent_repo = agent_repo;
+        self.server_url = server_url;
+        self
     }
 }
 
@@ -70,6 +90,9 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
         let broker = self.broker.clone();
         let registry = self.registry.clone();
         let grace_period_ms = self.grace_period_ms;
+        let token_store = self.token_store.clone();
+        let agent_repo = self.agent_repo.clone();
+        let server_url = self.server_url.clone();
 
         tokio::spawn(async move {
             if let Err(e) = run_stream(
@@ -80,6 +103,9 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
                 broker,
                 registry,
                 grace_period_ms,
+                token_store,
+                agent_repo,
+                server_url,
             )
             .await
             {
@@ -100,9 +126,21 @@ async fn run_stream<B: BrokerPublisher>(
     broker: Arc<B>,
     registry: SessionRegistry,
     grace_period_ms: i64,
+    token_store: Option<TokenStore>,
+    agent_repo: Option<Arc<AgentRepo>>,
+    server_url: String,
 ) -> Result<(), StreamError> {
-    let (agent_id, key_id) =
-        wait_for_handshake(&mut inbound, &tx, &agents, &registry, grace_period_ms).await?;
+    let (agent_id, key_id) = wait_for_handshake(
+        &mut inbound,
+        &tx,
+        &agents,
+        &registry,
+        grace_period_ms,
+        token_store.as_ref(),
+        agent_repo.as_deref(),
+        &server_url,
+    )
+    .await?;
 
     tracing::info!(agent_id = %agent_id, "stream authenticated");
 
@@ -131,6 +169,9 @@ async fn wait_for_handshake(
     agents: &AgentStore,
     registry: &SessionRegistry,
     grace_period_ms: i64,
+    token_store: Option<&TokenStore>,
+    agent_repo: Option<&AgentRepo>,
+    server_url: &str,
 ) -> Result<(String, String), StreamError> {
     let first_msg = tokio::time::timeout(
         std::time::Duration::from_secs(HANDSHAKE_TIMEOUT_SECS),
@@ -141,21 +182,82 @@ async fn wait_for_handshake(
     .ok_or(StreamError::StreamClosed)?
     .map_err(|e| StreamError::Transport(e.to_string()))?;
 
-    let handshake = match first_msg.payload {
-        Some(AgentPayload::Handshake(h)) => h,
+    match first_msg.payload {
+        Some(AgentPayload::BootstrapRequest(req)) => {
+            handle_bootstrap_request(tx, token_store, agents, agent_repo, req, server_url).await
+        }
+        Some(AgentPayload::Handshake(h)) => {
+            complete_handshake(tx, agents, registry, &h, grace_period_ms).await
+        }
         _ => {
             let _ = tx
                 .send(Err(Status::unauthenticated(
-                    "first message must be handshake",
+                    "first message must be handshake or bootstrap request",
                 )))
                 .await;
-            return Err(StreamError::Protocol(
-                "expected handshake as first message".into(),
-            ));
+            Err(StreamError::Protocol(
+                "expected handshake or bootstrap as first message".into(),
+            ))
+        }
+    }
+}
+
+async fn handle_bootstrap_request(
+    tx: &Arc<mpsc::Sender<Result<ServerMessage, Status>>>,
+    token_store: Option<&TokenStore>,
+    agents: &AgentStore,
+    agent_repo: Option<&AgentRepo>,
+    req: sentinel_common::proto::BootstrapRequest,
+    server_url: &str,
+) -> Result<(String, String), StreamError> {
+    let store = match token_store {
+        Some(s) => s,
+        None => {
+            let resp = ServerMessage {
+                payload: Some(ServerPayload::BootstrapResponse(
+                    sentinel_common::proto::BootstrapResponse {
+                        status: BootstrapStatus::BootstrapInvalidToken.into(),
+                        message: "provisioning not enabled".into(),
+                        ..Default::default()
+                    },
+                )),
+            };
+            let _ = tx.send(Ok(resp)).await;
+            return Err(StreamError::Protocol("provisioning not enabled".into()));
         }
     };
 
-    match authenticate_handshake(agents, &handshake, grace_period_ms) {
+    let outcome = handle_bootstrap(
+        store,
+        agents,
+        agent_repo,
+        &req.bootstrap_token,
+        &req.hw_id,
+        &req.agent_version,
+        server_url,
+    )
+    .await;
+
+    let resp = ServerMessage {
+        payload: Some(ServerPayload::BootstrapResponse(outcome.response.clone())),
+    };
+    let _ = tx.send(Ok(resp)).await;
+
+    if outcome.response.status == BootstrapStatus::BootstrapOk as i32 {
+        Err(StreamError::BootstrapComplete)
+    } else {
+        Err(StreamError::AuthFailed(outcome.response.message))
+    }
+}
+
+async fn complete_handshake(
+    tx: &Arc<mpsc::Sender<Result<ServerMessage, Status>>>,
+    agents: &AgentStore,
+    registry: &SessionRegistry,
+    handshake: &sentinel_common::proto::HandshakeRequest,
+    grace_period_ms: i64,
+) -> Result<(String, String), StreamError> {
+    match authenticate_handshake(agents, handshake, grace_period_ms) {
         AuthOutcome::Authenticated(auth) => {
             if registry.contains(&auth.agent_id) {
                 registry.unregister(&auth.agent_id);
@@ -245,6 +347,7 @@ enum StreamError {
     Transport(String),
     Protocol(String),
     AuthFailed(String),
+    BootstrapComplete,
 }
 
 impl std::fmt::Display for StreamError {
@@ -255,6 +358,7 @@ impl std::fmt::Display for StreamError {
             Self::Transport(e) => write!(f, "transport: {e}"),
             Self::Protocol(e) => write!(f, "protocol: {e}"),
             Self::AuthFailed(e) => write!(f, "auth failed: {e}"),
+            Self::BootstrapComplete => write!(f, "bootstrap complete, agent will reconnect"),
         }
     }
 }

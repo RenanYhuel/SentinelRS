@@ -3,8 +3,9 @@ use axum::Router;
 use sqlx::PgPool;
 use std::sync::Arc;
 
-use super::{agents, health, key_rotation, metrics, notifiers, rules};
+use super::{agents, health, key_rotation, metrics, notifiers, provisioning, rules};
 use crate::metrics::server_metrics::ServerMetrics;
+use crate::provisioning::TokenStore;
 use crate::store::{AgentStore, RuleStore};
 
 #[derive(Clone)]
@@ -14,6 +15,8 @@ pub struct AppState {
     pub jwt_secret: Vec<u8>,
     pub metrics: Arc<ServerMetrics>,
     pub pool: Option<PgPool>,
+    pub token_store: Option<TokenStore>,
+    pub grpc_public_url: String,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -27,6 +30,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/v1/agents/:agent_id/rotate-key",
             post(key_rotation::rotate_key),
+        )
+        .route(
+            "/v1/agents/generate-install",
+            post(provisioning::generate_install),
         )
         .route("/v1/rules", get(rules::list_rules).post(rules::create_rule))
         .route(

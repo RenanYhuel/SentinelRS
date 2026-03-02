@@ -4,6 +4,7 @@ mod health;
 mod key_rotation;
 mod metrics;
 mod notifiers;
+mod provisioning;
 mod router;
 mod rules;
 

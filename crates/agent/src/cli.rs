@@ -5,6 +5,8 @@ pub struct Args {
     pub legacy_mode: bool,
 }
 
+const DEFAULT_CONFIG_PATH: &str = "/etc/sentinel/config.yml";
+
 pub fn parse() -> Args {
     let mut args = std::env::args().skip(1);
     let mut config_path = None;
@@ -19,7 +21,7 @@ pub fn parse() -> Args {
             "--help" | "-h" => {
                 println!("Usage: sentinel_agent [OPTIONS]\n");
                 println!("Options:");
-                println!("  -c, --config <PATH>  Configuration file path");
+                println!("  -c, --config <PATH>  Configuration file path (default: {DEFAULT_CONFIG_PATH})");
                 println!("  --legacy-mode        Use V1 unary gRPC (no streaming)");
                 println!("  -V, --version        Print version");
                 println!("  -h, --help           Print help");
@@ -42,14 +44,8 @@ pub fn parse() -> Args {
         }
     }
 
-    match config_path {
-        Some(p) => Args {
-            config_path: p,
-            legacy_mode,
-        },
-        None => {
-            eprintln!("error: --config <path> is required");
-            std::process::exit(1);
-        }
+    Args {
+        config_path: config_path.unwrap_or_else(|| PathBuf::from(DEFAULT_CONFIG_PATH)),
+        legacy_mode,
     }
 }

@@ -13,7 +13,19 @@ async fn main() {
 
     tracing::info!("SentinelRS agent starting");
 
-    let config = match sentinel_agent::config::load_from_file(&args.config_path) {
+    let config_path = match sentinel_agent::bootstrap::run_if_needed(&args.config_path).await {
+        Ok(Some(new_path)) => {
+            tracing::info!("bootstrap complete, loading provisioned config");
+            new_path
+        }
+        Ok(None) => args.config_path.clone(),
+        Err(e) => {
+            tracing::error!(error = %e, "bootstrap failed");
+            std::process::exit(1);
+        }
+    };
+
+    let config = match sentinel_agent::config::load_from_file(&config_path) {
         Ok(cfg) => cfg,
         Err(e) => {
             tracing::error!(error = %e, "failed to load configuration");

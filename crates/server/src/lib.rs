@@ -6,6 +6,7 @@ pub mod metrics;
 pub mod middleware;
 pub mod migration;
 pub mod persistence;
+pub mod provisioning;
 pub mod rest;
 pub mod store;
 pub mod stream;

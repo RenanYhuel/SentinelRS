@@ -6,6 +6,7 @@ use sentinel_server::grpc::AgentServiceImpl;
 use sentinel_server::metrics::server_metrics::ServerMetrics;
 use sentinel_server::migration;
 use sentinel_server::persistence::AgentRepo;
+use sentinel_server::provisioning::TokenStore;
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
 use sentinel_server::stream::{SessionRegistry, StreamService};
@@ -98,12 +99,20 @@ async fn main() {
     };
 
     let session_registry = SessionRegistry::new();
+    let token_store = TokenStore::new();
+    let grpc_public_url = format!("http://{}", config.grpc_addr);
+
     let stream_service = StreamService::new(
         agents.clone(),
         idempotency,
         broker,
         session_registry.clone(),
         config.key_grace_period_ms,
+    )
+    .with_provisioning(
+        token_store.clone(),
+        agent_repo.clone(),
+        grpc_public_url.clone(),
     );
 
     let grpc_addr = config.grpc_addr;
@@ -133,6 +142,8 @@ async fn main() {
         jwt_secret: config.jwt_secret,
         metrics: server_metrics,
         pool,
+        token_store: Some(token_store),
+        grpc_public_url,
     };
     let rest_app = rest::router(app_state);
     let rest_addr = config.rest_addr;
