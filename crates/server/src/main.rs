@@ -10,7 +10,7 @@ use sentinel_server::config::ServerConfig;
 use sentinel_server::grpc::AgentServiceImpl;
 use sentinel_server::metrics::server_metrics::ServerMetrics;
 use sentinel_server::migration;
-use sentinel_server::persistence::{AgentRepo, NotifierRepo, RuleRepo};
+use sentinel_server::persistence::{AgentRepo, NotificationHistoryRepo, NotifierRepo, RuleRepo};
 use sentinel_server::provisioning::TokenStore;
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
@@ -31,7 +31,7 @@ async fn main() {
 
     let config = ServerConfig::from_env_and_args();
 
-    let (pool, agent_repo, rule_repo, notifier_repo) = match config.database_url {
+    let (pool, agent_repo, rule_repo, notifier_repo, history_repo) = match config.database_url {
         Some(ref url) => {
             let sw = logging::stopwatch();
             let health_config = migration::HealthConfig::default();
@@ -55,11 +55,12 @@ async fn main() {
             let repo = Arc::new(AgentRepo::new(pool.clone()));
             let r_repo = Arc::new(RuleRepo::new(pool.clone()));
             let n_repo = Arc::new(NotifierRepo::new(pool.clone()));
-            (Some(pool), Some(repo), Some(r_repo), Some(n_repo))
+            let h_repo = Arc::new(NotificationHistoryRepo::new(pool.clone()));
+            (Some(pool), Some(repo), Some(r_repo), Some(n_repo), Some(h_repo))
         }
         None => {
             tracing::warn!(target: "db", "No DATABASE_URL — in-memory mode");
-            (None, None, None, None)
+            (None, None, None, None, None)
         }
     };
 
@@ -164,6 +165,7 @@ async fn main() {
         rules,
         rule_repo,
         notifier_repo,
+        history_repo,
         jwt_secret: config.jwt_secret,
         metrics: server_metrics,
         pool,

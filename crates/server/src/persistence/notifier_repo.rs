@@ -86,6 +86,19 @@ impl NotifierRepo {
             .await?;
         Ok(result.rows_affected() > 0)
     }
+
+    pub async fn update(&self, r: &NotifierConfigRecord) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE notifier_configs SET name = $1, config = $2, enabled = $3 WHERE id = $4",
+        )
+        .bind(&r.name)
+        .bind(&r.config)
+        .bind(r.enabled)
+        .bind(&r.id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }
 
 #[derive(sqlx::FromRow)]

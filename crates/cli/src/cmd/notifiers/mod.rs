@@ -1,8 +1,11 @@
 mod create;
 mod delete;
+mod enable;
+mod history;
 mod link;
 mod list;
 mod test;
+mod update;
 
 use anyhow::Result;
 use clap::Subcommand;
@@ -25,6 +28,15 @@ pub enum NotifiersCmd {
 
     #[command(about = "Send a test notification")]
     Test(test::TestArgs),
+
+    #[command(about = "Toggle notifier enabled/disabled", visible_alias = "toggle")]
+    Enable(enable::EnableArgs),
+
+    #[command(about = "Update a notifier", visible_alias = "edit")]
+    Update(update::UpdateArgs),
+
+    #[command(about = "Notification delivery history", visible_alias = "log")]
+    History(history::HistoryArgs),
 }
 
 pub async fn execute(cmd: NotifiersCmd, mode: OutputMode, server: Option<String>) -> Result<()> {
@@ -34,5 +46,8 @@ pub async fn execute(cmd: NotifiersCmd, mode: OutputMode, server: Option<String>
         NotifiersCmd::Delete(args) => delete::run(args, mode, server).await,
         NotifiersCmd::Link(args) => link::run(args, mode, server).await,
         NotifiersCmd::Test(args) => test::run(args, mode, server).await,
+        NotifiersCmd::Enable(args) => enable::run(args, mode, server).await,
+        NotifiersCmd::Update(args) => update::run(args, mode, server).await,
+        NotifiersCmd::History(args) => history::run(args, mode, server).await,
     }
 }

@@ -74,6 +74,18 @@ impl ApiClient {
         Ok(resp.status())
     }
 
+    pub async fn post_empty(&self, path: &str) -> Result<serde_json::Value> {
+        let resp = self
+            .http
+            .post(self.url(path))
+            .send()
+            .await
+            .context("request failed")?
+            .error_for_status()
+            .context("server returned error")?;
+        resp.json().await.context("invalid JSON response")
+    }
+
     pub async fn get_text(&self, path: &str) -> Result<String> {
         let resp = self
             .http

@@ -14,6 +14,13 @@ pub struct CreateNotifierRequest {
     pub enabled: Option<bool>,
 }
 
+#[derive(Deserialize)]
+pub struct UpdateNotifierRequest {
+    pub name: Option<String>,
+    pub config: Option<serde_json::Value>,
+    pub enabled: Option<bool>,
+}
+
 #[derive(Serialize)]
 pub struct NotifierConfigResponse {
     pub id: String,
@@ -35,7 +42,18 @@ fn to_response(r: NotifierConfigRecord) -> NotifierConfigResponse {
     }
 }
 
-const VALID_TYPES: &[&str] = &["webhook", "slack", "discord", "smtp"];
+const VALID_TYPES: &[&str] = &[
+    "webhook",
+    "slack",
+    "discord",
+    "smtp",
+    "telegram",
+    "pagerduty",
+    "teams",
+    "opsgenie",
+    "gotify",
+    "ntfy",
+];
 
 pub async fn list_notifier_configs(
     State(state): State<AppState>,
@@ -103,6 +121,73 @@ pub async fn create_notifier_config(
     Ok((StatusCode::CREATED, Json(to_response(record))))
 }
 
+pub async fn update_notifier_config(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<UpdateNotifierRequest>,
+) -> Result<Json<NotifierConfigResponse>, StatusCode> {
+    let repo = state
+        .notifier_repo
+        .as_ref()
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+
+    let existing = repo
+        .get(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!(target: "rest", error = %e, "notifier_configs get failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let updated = NotifierConfigRecord {
+        id: existing.id,
+        name: body.name.unwrap_or(existing.name),
+        ntype: existing.ntype,
+        config: body.config.unwrap_or(existing.config),
+        enabled: body.enabled.unwrap_or(existing.enabled),
+        created_at_ms: existing.created_at_ms,
+    };
+
+    repo.update(&updated).await.map_err(|e| {
+        tracing::error!(target: "rest", error = %e, "notifier_configs update failed");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(to_response(updated)))
+}
+
+pub async fn toggle_notifier_config(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<NotifierConfigResponse>, StatusCode> {
+    let repo = state
+        .notifier_repo
+        .as_ref()
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+
+    let existing = repo
+        .get(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!(target: "rest", error = %e, "notifier_configs get failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let toggled = NotifierConfigRecord {
+        enabled: !existing.enabled,
+        ..existing
+    };
+
+    repo.update(&toggled).await.map_err(|e| {
+        tracing::error!(target: "rest", error = %e, "notifier_configs toggle failed");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(to_response(toggled)))
+}
+
 pub async fn delete_notifier_config(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -119,3 +204,4 @@ pub async fn delete_notifier_config(
         }
     }
 }
+
