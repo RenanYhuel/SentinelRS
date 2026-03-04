@@ -4,7 +4,7 @@ Thank you for your interest in contributing to SentinelRS.
 
 ## Getting Started
 
-1. Fork the repository
+1. Fork the repository: https://github.com/RenanYhuel/SentinelRS
 2. Clone your fork
 3. Set up the development environment (see [docs/development.md](docs/development.md))
 4. Create a feature branch from `main`
@@ -12,15 +12,12 @@ Thank you for your interest in contributing to SentinelRS.
 ## Development Workflow
 
 ```bash
-# Create a branch
 git checkout -b feat/my-feature
 
-# Make changes, then verify
 cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 
-# Commit and push
 git commit -m "feat: description of the change"
 git push origin feat/my-feature
 ```
@@ -54,26 +51,33 @@ refactor: extract HMAC verification into middleware
 
 ## Adding a New CLI Command
 
-1. Create a new file in `crates/cli/src/cmd/`
-2. Define the args struct and `execute` function
-3. Register the command in `crates/cli/src/cmd/mod.rs`
-4. Add tests in `crates/cli/src/tests/`
+See [docs/development.md](docs/development.md#how-to-add-a-new-cli-command).
 
 ## Adding a New REST Endpoint
 
-1. Create a handler in the appropriate module under `crates/server/src/rest/`
-2. Register the route in `crates/server/src/rest/router.rs`
-3. Add integration tests in `crates/server/tests/`
+See [docs/development.md](docs/development.md#how-to-add-a-new-rest-endpoint).
 
 ## Adding a WASM Host Function
 
-1. Add the function in `crates/agent/src/plugin/runtime.rs`
-2. Document the function signature in `docs/security.md`
-3. Update the `capabilities` list in the manifest schema
+See [docs/development.md](docs/development.md#how-to-add-a-new-wasm-host-function) and [docs/plugin-development.md](docs/plugin-development.md).
+
+## Documentation
+
+When adding features, update the relevant doc:
+
+| Feature          | Doc to update                                            |
+| ---------------- | -------------------------------------------------------- |
+| CLI command      | [docs/cli-reference.md](docs/cli-reference.md)           |
+| REST endpoint    | [docs/api-reference.md](docs/api-reference.md)           |
+| Config option    | [docs/configuration.md](docs/configuration.md)           |
+| Notification     | [docs/notifications.md](docs/notifications.md)           |
+| Protocol change  | [docs/streaming.md](docs/streaming.md)                   |
+| Security feature | [docs/security.md](docs/security.md)                     |
+| WASM plugin API  | [docs/plugin-development.md](docs/plugin-development.md) |
 
 ## Reporting Issues
 
-- Use GitHub Issues
+- Use [GitHub Issues](https://github.com/RenanYhuel/SentinelRS/issues)
 - Include: steps to reproduce, expected behavior, actual behavior
 - For bugs: include OS, Rust version and relevant logs
 

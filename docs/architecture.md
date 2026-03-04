@@ -2,173 +2,215 @@
 
 ## Overview
 
-SentinelRS is a distributed monitoring system composed of four independently deployable binaries that communicate through gRPC (V1 unary + V2 bidirectional streaming), NATS JetStream and a shared TimescaleDB database.
+SentinelRS is a distributed monitoring system composed of 4 independently deployable binaries and 2 infrastructure services.
 
 ```
-                              ┌─────────────────────────────────┐
-                              │           Server                │
-Agent 1 ══gRPC Stream════════▶│  ┌─────────────┐ ┌──────────┐  │
-Agent 2 ══gRPC Stream════════▶│  │ Stream      │ │ REST API │  │    NATS JetStream
-Agent N ══gRPC Stream════════▶│  │ Service     │ │ :8080    │  │───────────────────┐
-                              │  │ :50051      │ └──────────┘  │                   │
-                              │  └──────┬──────┘               │                   ▼
-                              │         │ validate + publish   │           ┌──────────────┐
-          CLI ──REST─────────▶│  ┌──────┴──────┐               │           │   Workers    │
-                              │  │ Session     │               │──────────▶│              │
-                              │  │ Registry    │               │           │ Consumer     │
-                              │  │ Presence    │               │           │ Aggregator   │
-                              │  │ Provisioning│               │           │ Alert Engine │
-                              │  └─────────────┘               │           │ Notifiers    │
-                              └─────────────────────────────────┘           └──────┬───────┘
-                                                                                  │
-                                                                           TimescaleDB
+┌──────────────────────────────────────────────────────────────────────┐
+│                          SentinelRS                                  │
+│                                                                      │
+│  ┌─────────┐   gRPC bidi    ┌──────────┐   NATS     ┌──────────┐   │
+│  │  Agent   │ ─────────────▶ │  Server  │ ─────────▶ │ Workers  │   │
+│  │ (N hosts)│ ◀───────────── │          │            │ (N inst) │   │
+│  └─────────┘   stream       │          │            └────┬─────┘   │
+│       │                      │  REST API│                 │         │
+│       │ collect              │  :8080   │                 │ write   │
+│       ▼                      └────┬─────┘                 ▼         │
+│  ┌─────────┐                      │              ┌──────────────┐   │
+│  │ sysinfo │                      │ query        │ TimescaleDB  │   │
+│  │ plugins │                      └─────────────▶│  (Postgres)  │   │
+│  └─────────┘                                     └──────────────┘   │
+│                                                                      │
+│  ┌─────────┐                                                        │
+│  │   CLI   │  REST ──▶ Server :8080                                 │
+│  └─────────┘                                                        │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+## Components
+
+### Agent (`sentinel_agent`)
+
+Runs on every monitored host. Collects system metrics (CPU, memory, disk, load, processes) via `sysinfo`, optionally augmented by WASM plugins. Sends signed metric batches to the server over a persistent gRPC bidirectional stream.
+
+**Key modules:**
+
+| Module       | Path                   | Purpose                                   |
+| ------------ | ---------------------- | ----------------------------------------- |
+| Collector    | `agent/src/collector/` | System metrics collection via sysinfo     |
+| Plugin       | `agent/src/plugin/`    | WASM plugin loader and runtime (wasmtime) |
+| Buffer (WAL) | `agent/src/buffer/`    | Write-Ahead Log for crash resilience      |
+| Security     | `agent/src/security/`  | HMAC signing, key rotation, key store     |
+| Scheduler    | `agent/src/scheduler/` | Collection interval timer                 |
+| Exporter     | `agent/src/exporter/`  | Batch building, signing, gRPC send        |
+| Config       | `agent/src/config/`    | YAML config loader and validation         |
+
+**Data flow:**
+
+1. Scheduler triggers collection at configured interval (default: 10s)
+2. Collector gathers system metrics + plugin metrics
+3. Metrics batched, HMAC-SHA256 signed, optionally gzip compressed
+4. Sent over the gRPC stream; if server is unreachable, written to WAL
+5. WAL replays unacknowledged batches on reconnection
+
+### Server (`sentinel_server`)
+
+Single binary serving two protocols:
+
+- **gRPC** (port 50051): Bidirectional streaming with agents — handshake, metrics ingestion, heartbeats, commands
+- **REST** (port 8080): JSON API for the CLI, dashboards, and integrations
+
+**Key modules:**
+
+| Module        | Path                            | Purpose                                  |
+| ------------- | ------------------------------- | ---------------------------------------- |
+| Stream        | `server/src/stream/`            | gRPC stream handler, session management  |
+| Registry      | `server/src/stream/registry.rs` | In-memory agent sessions (DashMap)       |
+| REST handlers | `server/src/rest/`              | All REST endpoints (agents, rules, etc.) |
+| Auth          | `server/src/auth/`              | JWT validation, HMAC verification        |
+| TLS           | `server/src/tls.rs`             | Optional TLS/mTLS configuration          |
+
+**Session tracking:**
+
+The `SessionRegistry` maintains a `DashMap<String, Session>` of all connected agents with:
+
+- Connection timestamp, last heartbeat, heartbeat count
+- Live system stats (CPU, memory, disk, load, uptime)
+- Latency tracker (sliding window of 128 samples, percentiles)
+- Connection quality assessment (Excellent/Good/Fair/Poor)
+
+### Workers (`sentinel_workers`)
+
+Consume metric batches from NATS JetStream, write to TimescaleDB, evaluate alert rules, and dispatch notifications.
+
+**Key modules:**
+
+| Module          | Path                                 | Purpose                                |
+| --------------- | ------------------------------------ | -------------------------------------- |
+| Consumer        | `workers/src/`                       | NATS JetStream consumer                |
+| Alert evaluator | `workers/src/`                       | Rule matching against incoming metrics |
+| Notifier        | `workers/src/notifier/`              | 10 notification backends + retry + DLQ |
+| Dispatcher      | `workers/src/notifier/dispatcher.rs` | Routes alerts to configured notifiers  |
+
+### CLI (`sentinel_cli`)
+
+Interactive command-line tool communicating exclusively with the server's REST API. No direct database or NATS access.
+
+**Key modules:**
+
+| Module   | Path              | Purpose                                |
+| -------- | ----------------- | -------------------------------------- |
+| Commands | `cli/src/cmd/`    | All subcommand implementations         |
+| Client   | `cli/src/client/` | HTTP client wrapper (reqwest)          |
+| Output   | `cli/src/output/` | Tables, bar charts, sparklines, themes |
+
+### Common (`sentinel_common`)
+
+Shared library used by all crates:
+
+| Module           | Purpose                                     |
+| ---------------- | ------------------------------------------- |
+| `proto/`         | Protobuf definitions (compiled via `prost`) |
+| `crypto.rs`      | HMAC-SHA256 signing and verification        |
+| `retry.rs`       | Generic retry with exponential backoff      |
+| `batch_id.rs`    | Batch ID generation                         |
+| `trace_id.rs`    | Distributed trace ID generation             |
+| `seq.rs`         | Monotonic sequence numbers                  |
+| `nats_config.rs` | NATS connection helpers                     |
+| `metric_json.rs` | Metric serialization                        |
 
 ## Data Flow
 
-1. **Collection** — The agent collects system metrics (CPU, memory, disk) via built-in collectors and optional WASM plugins on a configurable interval.
+```
+Agent                    Server                NATS             Worker            DB
+  │                        │                    │                 │                │
+  │── HandshakeRequest ──▶ │                    │                 │                │
+  │◀── HandshakeAck ────── │                    │                 │                │
+  │                        │                    │                 │                │
+  │── MetricsBatch ──────▶ │                    │                 │                │
+  │                        │── publish ────────▶│                 │                │
+  │                        │                    │── deliver ─────▶│                │
+  │                        │                    │                 │── INSERT ─────▶│
+  │                        │                    │                 │── evaluate ──▶ │
+  │                        │                    │                 │── notify ─────▶│
+  │◀── BatchAck ────────── │                    │                 │                │
+  │                        │                    │                 │                │
+  │── HeartbeatPing ─────▶ │                    │                 │                │
+  │◀── HeartbeatPong ───── │                    │                 │                │
+```
 
-2. **Batching & Signing** — Metrics are grouped into protobuf `MetricsBatch` messages. Each batch is signed with HMAC-SHA256 using the agent's secret key, then written to the local append-only WAL.
-
-3. **Streaming** — The agent maintains a persistent bidirectional gRPC stream (`SentinelStream.OpenStream`) to the server. On connection, it performs a signed handshake. Unacked WAL entries are sent as `MetricsBatch` frames and acknowledged individually by the server. Periodic `HeartbeatPing` messages carry live system stats for presence tracking.
-
-4. **Ingestion** — The server's stream dispatcher validates the HMAC signature, checks for replay attacks, deduplicates via the idempotency store, then publishes the batch to NATS JetStream. The session registry tracks all active streams.
-
-5. **Processing** — Workers pull batches from NATS JetStream via a durable pull consumer. Each batch is decoded, ingested into the rolling aggregator, evaluated against alert rules, and persisted to TimescaleDB.
-
-6. **Alerting** — The alert engine evaluates rules against aggregated metrics. When a threshold is breached (optionally after a `for_duration` hold), a `Firing` event is generated. When the condition clears, a `Resolved` event follows. Events are persisted and dispatched to configured notifiers.
-
-7. **Presence** — The server's watchdog monitors heartbeat intervals. Missing heartbeats trigger disconnect events on the `PresenceEventBus`, exposed via SSE for real-time cluster monitoring.
-
-8. **Query** — The REST API and CLI provide read access to agents, metrics, alert rules, cluster status and live presence events.
-
-## Crate Responsibilities
-
-### sentinel_common
-
-Shared library used by all other crates.
-
-- **Protobuf definitions** — V1 (`Batch`, `AgentService`) and V2 (`AgentMessage`, `ServerMessage`, `SentinelStream`) generated via `tonic-build` + `prost-build`
-- **Crypto** — HMAC-SHA256 signing/verification, secret generation
-- **NATS config** — Stream name, subjects, retention settings
-- **Utilities** — Batch ID generation, sequence numbers, trace IDs, canonical path resolution, retry helpers
-
-### sentinel_agent
-
-Standalone binary that runs on each monitored host.
-
-| Module        | Purpose                                                                                |
-| ------------- | -------------------------------------------------------------------------------------- |
-| `collector/`  | System metrics collection via `sysinfo` (CPU, memory, disk)                            |
-| `plugin/`     | WASM plugin runtime (wasmtime) — manifest loading, sandboxed execution, host functions |
-| `buffer/`     | Append-only WAL with segmented files, CRC32 integrity, compaction                      |
-| `scheduler/`  | Periodic collection scheduling                                                         |
-| `stream/`     | V2 bidirectional gRPC client — connection, handshake, sender, receiver, reconnect      |
-| `bootstrap/`  | Zero-touch provisioning — token detection, negotiation, config writing                 |
-| `exporter/`   | V1 gRPC exporter (unary) + HTTP fallback                                               |
-| `batch.rs`    | Batching collected metrics into protobuf messages                                      |
-| `security/`   | Encrypted key store (AES-256-GCM), HMAC signer, compression                            |
-| `config/`     | YAML config loading and validation                                                     |
-| `cli.rs`      | CLI argument parsing (`--config`, `--help`, `--version`)                               |
-| `run.rs`      | Async orchestration — wires all modules together                                       |
-| `shutdown.rs` | Graceful shutdown on SIGTERM/SIGINT                                                    |
-| `api/`        | Local HTTP API — health checks and Prometheus metrics                                  |
-
-### sentinel_server
-
-Stateless ingestion gateway. Runs two listeners concurrently:
-
-| Component   | Default Port | Purpose                                                           |
-| ----------- | ------------ | ----------------------------------------------------------------- |
-| gRPC server | 50051        | V2 streaming (`SentinelStream`) + V1 unary (`AgentService`)       |
-| REST API    | 8080         | Admin endpoints — agents, rules, notifiers, metrics, cluster, SSE |
-
-Both ports are configurable via CLI flags (`--grpc-port`, `--rest-port`) or environment variables (`GRPC_ADDR`, `REST_ADDR`).
-
-Internal components:
-
-- **Stream service** — `StreamService` implementing `SentinelStream.OpenStream`, routing frames to specialized handlers
-- **Session registry** — `SessionRegistry` tracking all active streaming sessions with `ClusterStats`
-- **Presence** — `PresenceEventBus` emitting connect/disconnect events, `Watchdog` detecting silent agents
-- **Provisioning** — `TokenStore`, `BootstrapOutcome` handling zero-touch agent setup
-- **Auth** — HMAC-SHA256 for gRPC stream handshake, JWT for REST API
-- **Middleware** — Rate limiting, replay window enforcement
-- **Broker** — NATS publisher (publishes validated batches to JetStream)
-- **Stores** — Agent store, idempotency store, rule store (in-memory, behind `DashMap`)
-
-### sentinel_workers
-
-Background processing service. Connects to both NATS and TimescaleDB.
-
-| Module        | Purpose                                                                           |
-| ------------- | --------------------------------------------------------------------------------- |
-| `consumer/`   | NATS JetStream pull consumer — durable, explicit ack, max 5 redeliveries          |
-| `aggregator/` | Rolling time-series windows — avg, min, max, last, count per (agent, metric)      |
-| `alert/`      | Rule evaluation engine with FSM state tracking (Ok → Pending → Firing → Resolved) |
-| `dedup/`      | Batch deduplication                                                               |
-| `metrics/`    | Worker-level Prometheus metrics                                                   |
-| `api/`        | Health/metrics HTTP endpoint                                                      |
-
-### sentinel_cli
-
-Admin command-line tool. Communicates with the server REST API and reads local agent config/WAL.
-
-Commands: `init`, `doctor`, `completions`, `agents` (list, get, live, delete, generate-install), `cluster` (status, agents, watch), `config`, `rules`, `notifiers`, `key`, `wal`, `metrics`, `health`, `status`, `register`, `force-send`, `version`.
-
-Full reference: [cli.md](cli.md)
+1. **Handshake**: Agent authenticates with HMAC-signed request; server verifies and creates session
+2. **Metrics streaming**: Agent sends batches; server publishes to NATS; replies with ACK/REJECT/RETRY
+3. **Processing**: Workers consume from NATS, write to TimescaleDB, evaluate alert rules
+4. **Alerting**: Matched rules trigger notifications via configured channels (with retry + DLQ)
+5. **Heartbeat**: Periodic ping/pong with system stats for presence tracking and latency measurement
+6. **Commands**: Server can push config updates, restart collectors, or update intervals
 
 ## Database Schema
 
-TimescaleDB (PostgreSQL 14+) with the following tables:
+TimescaleDB (PostgreSQL + time-series extensions).
 
-| Table               | Type                      | Purpose                               |
-| ------------------- | ------------------------- | ------------------------------------- |
-| `metrics_time`      | Hypertable (1-day chunks) | Structured metric storage with labels |
-| `metrics_raw`       | Hypertable (1-day chunks) | Raw batch payloads (JSONB)            |
-| `alerts`            | Regular table             | Alert events (firing/resolved)        |
-| `alert_rules`       | Regular table             | Alert rule definitions                |
-| `notifications_dlq` | Regular table             | Failed notification dead-letter queue |
-| `mv_metrics_1h`     | Continuous aggregate      | 1-hour rollups (avg, min, max, count) |
+### Tables
 
-Views: `v_top_metrics`, `v_recent_values`, `v_active_alerts`.
+| Table                  | Purpose                             | Partitioning |
+| ---------------------- | ----------------------------------- | ------------ |
+| `metrics_time`         | Parsed metrics (hypertable)         | 1-day chunks |
+| `metrics_raw`          | Raw batch payloads (hypertable)     | 1-day chunks |
+| `alerts`               | Fired alert instances               | —            |
+| `alert_rules`          | Alert rule definitions              | —            |
+| `agents`               | Registered agent records            | —            |
+| `notifier_configs`     | Notification channel configurations | —            |
+| `notification_history` | Notification delivery log           | —            |
+| `notifications_dlq`    | Dead-letter queue for failed notifs | —            |
 
-Retention policies: 7 days for raw data, 90 days for structured metrics.
+### Continuous Aggregates
 
-Full schema in `migrations/`.
+| View            | Bucket | Columns                         |
+| --------------- | ------ | ------------------------------- |
+| `mv_metrics_5m` | 5 min  | avg, min, max, count per metric |
+| `mv_metrics_1h` | 1 hour | avg, min, max, count per metric |
+
+### Retention Policies
+
+| Table          | Retention |
+| -------------- | --------- |
+| `metrics_raw`  | 7 days    |
+| `metrics_time` | 90 days   |
 
 ## Protocol
 
-Communication between agent and server uses Protocol Buffers over gRPC.
-
-### Services
+### gRPC Service
 
 ```protobuf
-// V2 — Persistent bidirectional stream (preferred)
 service SentinelStream {
   rpc OpenStream(stream AgentMessage) returns (stream ServerMessage);
 }
-
-// V1 — Legacy unary RPCs (backward compatible)
-service AgentService {
-  rpc Register(RegisterRequest) returns (RegisterResponse);
-  rpc PushMetrics(Batch) returns (PushResponse);
-  rpc SendHeartbeat(Heartbeat) returns (PushResponse);
-}
 ```
 
-### Key Messages (V2)
+### Message Types
 
-- **AgentMessage** — Envelope carrying `HandshakeRequest`, `MetricsBatch`, `HeartbeatPing` or `BootstrapRequest`
-- **ServerMessage** — Envelope carrying `HandshakeAck`, `BatchAck`, `HeartbeatPong`, `BootstrapResponse`, `ConfigUpdate`, `Command` or `ServerError`
-- **MetricsBatch** — Container for metrics with batch ID, sequence range, HMAC signature
-- **SystemStats** — Live system telemetry (CPU, memory, disk, load, uptime, hostname)
+**Agent → Server:**
 
-### Key Messages (V1)
+- `HandshakeRequest` — authentication (agent_id, signature, timestamp, capabilities)
+- `MetricsBatch` — signed metric payload
+- `HeartbeatPing` — system stats + sequence number
 
-- **Batch** — Container for metrics with `agent_id`, `batch_id`, sequence range, timestamp and metadata
-- **Metric** — Name, labels (key-value), type (gauge/counter/histogram), value and timestamp
-- **RegisterRequest/Response** — Hardware ID exchange for agent ID + secret provisioning
+**Server → Agent:**
 
-Full definition: `crates/common/proto/sentinel.proto`
+- `HandshakeAck` — session ID + status
+- `BatchAck` — accepted/rejected/retry per batch
+- `HeartbeatPong` — latency measurement
+- `ConfigUpdate` — push new configuration
+- `Command` — reload config, restart collector, update interval
+- `ServerError` — error with code and message
 
-Detailed streaming protocol: [streaming.md](streaming.md)
+See [Streaming Protocol](streaming.md) for the complete protocol specification.
+
+## Network Ports
+
+| Service         | Port  | Protocol | Purpose               |
+| --------------- | ----- | -------- | --------------------- |
+| Server gRPC     | 50051 | HTTP/2   | Agent streaming       |
+| Server REST     | 8080  | HTTP/1.1 | API for CLI/dashboard |
+| TimescaleDB     | 5432  | TCP      | PostgreSQL            |
+| NATS            | 4222  | TCP      | JetStream messaging   |
+| NATS Monitoring | 8222  | HTTP     | NATS health/stats     |
