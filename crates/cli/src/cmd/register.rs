@@ -84,7 +84,7 @@ fn resolve_grpc_endpoint(server: Option<&str>) -> Result<String> {
         return Ok(s.to_string());
     }
     if let Ok(cfg) = crate::store::load() {
-        let mut url = cfg.server_url.clone();
+        let mut url = cfg.server.grpc_url.clone();
         if !url.starts_with("http") {
             url = format!("http://{url}");
         }

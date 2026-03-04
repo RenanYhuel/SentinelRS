@@ -4,10 +4,11 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 use super::{
-    agents, alerts, cluster, health, key_rotation, metrics, notifiers, provisioning, rules,
+    agents, alerts, cluster, health, key_rotation, metrics, notifier_configs, notifiers,
+    provisioning, rules,
 };
 use crate::metrics::server_metrics::ServerMetrics;
-use crate::persistence::RuleRepo;
+use crate::persistence::{NotifierRepo, RuleRepo};
 use crate::provisioning::TokenStore;
 use crate::store::{AgentStore, RuleStore};
 use crate::stream::{PresenceEventBus, SessionRegistry};
@@ -17,6 +18,7 @@ pub struct AppState {
     pub agents: AgentStore,
     pub rules: RuleStore,
     pub rule_repo: Option<Arc<RuleRepo>>,
+    pub notifier_repo: Option<Arc<NotifierRepo>>,
     pub jwt_secret: Vec<u8>,
     pub metrics: Arc<ServerMetrics>,
     pub pool: Option<PgPool>,
@@ -52,6 +54,16 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/alerts", get(alerts::list_alerts))
         .route("/v1/alerts/:alert_id", get(alerts::get_alert))
         .route("/v1/notifiers/test", post(notifiers::test_notifier))
+        .route(
+            "/v1/notifiers",
+            get(notifier_configs::list_notifier_configs)
+                .post(notifier_configs::create_notifier_config),
+        )
+        .route(
+            "/v1/notifiers/:notifier_id",
+            get(notifier_configs::get_notifier_config)
+                .delete(notifier_configs::delete_notifier_config),
+        )
         .route("/v1/cluster/status", get(cluster::cluster_status))
         .route("/v1/cluster/agents", get(cluster::agent_ids))
         .route("/v1/cluster/events", get(cluster::cluster_events))

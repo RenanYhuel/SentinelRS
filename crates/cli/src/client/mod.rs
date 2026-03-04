@@ -19,7 +19,7 @@ fn resolve_url(flag: Option<&str>) -> Result<String> {
     }
 
     if let Ok(cfg) = store::load() {
-        return Ok(normalize(&cfg.server_url));
+        return Ok(normalize(cfg.server_url()));
     }
 
     let url = input::text("Server URL", "http://localhost:8080")?;

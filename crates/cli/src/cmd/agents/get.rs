@@ -1,8 +1,9 @@
 use anyhow::Result;
 use clap::Args;
+use colored::Colorize;
 
 use crate::client;
-use crate::output::{print_json, select, spinner, theme, OutputMode};
+use crate::output::{print_json, select, spinner, theme, time_ago, OutputMode};
 
 #[derive(Args)]
 pub struct GetArgs {
@@ -33,9 +34,21 @@ pub async fn run(args: GetArgs, mode: OutputMode, server: Option<String>) -> Res
         OutputMode::Json => print_json(&agent)?,
         OutputMode::Human => {
             theme::print_header("Agent Details");
-            for (k, v) in agent.as_object().into_iter().flatten() {
-                theme::print_kv(k, &v.to_string());
-            }
+            let status = agent["status"].as_str().unwrap_or("offline");
+            let status_display = if status == "online" {
+                format!("{} Online", "●".green())
+            } else {
+                format!("{} Offline", "●".red())
+            };
+            theme::print_kv("Status", &status_display);
+            theme::print_kv("Agent ID", agent["agent_id"].as_str().unwrap_or("-"));
+            theme::print_kv("HW ID", agent["hw_id"].as_str().unwrap_or("-"));
+            theme::print_kv("Version", agent["agent_version"].as_str().unwrap_or("-"));
+            let last_seen = agent["last_seen"]
+                .as_str()
+                .map(time_ago::format_relative)
+                .unwrap_or_else(|| "never".into());
+            theme::print_kv("Last Seen", &last_seen);
             println!();
         }
     }

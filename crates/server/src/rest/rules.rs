@@ -18,6 +18,7 @@ pub struct CreateRuleRequest {
     pub severity: Option<String>,
     pub annotations: Option<HashMap<String, String>>,
     pub enabled: Option<bool>,
+    pub notifier_ids: Option<Vec<String>>,
 }
 
 #[derive(Deserialize)]
@@ -31,6 +32,7 @@ pub struct UpdateRuleRequest {
     pub severity: Option<String>,
     pub annotations: Option<HashMap<String, String>>,
     pub enabled: Option<bool>,
+    pub notifier_ids: Option<Vec<String>>,
 }
 
 #[derive(Serialize)]
@@ -45,6 +47,7 @@ pub struct RuleResponse {
     pub severity: String,
     pub annotations: HashMap<String, String>,
     pub enabled: bool,
+    pub notifier_ids: Vec<String>,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
 }
@@ -61,6 +64,7 @@ fn to_response(r: RuleRecord) -> RuleResponse {
         severity: r.severity,
         annotations: r.annotations,
         enabled: r.enabled,
+        notifier_ids: r.notifier_ids,
         created_at_ms: r.created_at_ms,
         updated_at_ms: r.updated_at_ms,
     }
@@ -121,6 +125,7 @@ pub async fn create_rule(
         severity: severity.to_string(),
         annotations: body.annotations.unwrap_or_default(),
         enabled: body.enabled.unwrap_or(true),
+        notifier_ids: body.notifier_ids.unwrap_or_default(),
         created_at_ms: now_ms,
         updated_at_ms: now_ms,
     };
@@ -171,6 +176,7 @@ pub async fn update_rule(
         severity: body.severity.unwrap_or(existing.severity.clone()),
         annotations: body.annotations.unwrap_or(existing.annotations.clone()),
         enabled: body.enabled.unwrap_or(existing.enabled),
+        notifier_ids: body.notifier_ids.unwrap_or(existing.notifier_ids.clone()),
         created_at_ms: existing.created_at_ms,
         updated_at_ms: now_ms,
     };

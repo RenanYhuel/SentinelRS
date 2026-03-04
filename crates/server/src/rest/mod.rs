@@ -5,6 +5,7 @@ mod cluster;
 mod health;
 mod key_rotation;
 mod metrics;
+mod notifier_configs;
 mod notifiers;
 mod provisioning;
 mod router;

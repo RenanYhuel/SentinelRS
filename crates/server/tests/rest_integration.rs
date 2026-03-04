@@ -13,6 +13,7 @@ fn app_state() -> AppState {
         agents: AgentStore::new(),
         rules: RuleStore::new(),
         rule_repo: None,
+        notifier_repo: None,
         jwt_secret: b"test-secret".to_vec(),
         metrics: ServerMetrics::new(),
         pool: None,

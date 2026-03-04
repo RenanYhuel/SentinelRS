@@ -49,7 +49,7 @@ pub enum Commands {
     #[command(subcommand, about = "Alert rule management")]
     Rules(rules::RulesCmd),
 
-    #[command(subcommand, about = "Notifier testing")]
+    #[command(subcommand, about = "Notifier management", visible_alias = "notify")]
     Notifiers(notifiers::NotifiersCmd),
 
     #[command(subcommand, about = "Encryption key management")]

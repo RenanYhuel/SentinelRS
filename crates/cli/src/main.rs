@@ -36,7 +36,7 @@ impl Opts {
             return OutputMode::Json;
         }
         if let Ok(cfg) = store::load() {
-            if cfg.output == "json" {
+            if cfg.output() == "json" {
                 return OutputMode::Json;
             }
         }

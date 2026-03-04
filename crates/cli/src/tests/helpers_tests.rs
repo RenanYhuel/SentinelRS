@@ -49,20 +49,19 @@ security: {}
     #[test]
     fn store_config_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("cli.yml");
+        let path = dir.path().join("config.toml");
 
-        let cfg = crate::store::config::CliConfig {
-            server_url: "http://test:8080".into(),
-            output: "json".into(),
-        };
+        let mut cfg = crate::store::config::CliConfig::default();
+        cfg.server.url = "http://test:8080".into();
+        cfg.defaults.output_format = "json".into();
 
-        let yaml = serde_yaml::to_string(&cfg).unwrap();
-        std::fs::write(&path, &yaml).unwrap();
+        let toml_str = toml::to_string_pretty(&cfg).unwrap();
+        std::fs::write(&path, &toml_str).unwrap();
 
         let loaded: crate::store::config::CliConfig =
-            serde_yaml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(loaded.server_url, "http://test:8080");
-        assert_eq!(loaded.output, "json");
+            toml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(loaded.server.url, "http://test:8080");
+        assert_eq!(loaded.defaults.output_format, "json");
     }
 
     #[test]

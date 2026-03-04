@@ -15,7 +15,7 @@ impl RuleLoader {
     pub async fn load_enabled(&self) -> Result<Vec<Rule>, sqlx::Error> {
         let rows = sqlx::query_as::<_, RuleRow>(
             "SELECT id, name, agent_pattern, metric_name, condition, threshold,
-                    for_duration_ms, severity, annotations
+                    for_duration_ms, severity, annotations, notifier_ids
              FROM alert_rules WHERE enabled = TRUE",
         )
         .fetch_all(&self.pool)
@@ -36,6 +36,7 @@ struct RuleRow {
     for_duration_ms: i64,
     severity: String,
     annotations: serde_json::Value,
+    notifier_ids: serde_json::Value,
 }
 
 impl RuleRow {
@@ -56,6 +57,8 @@ impl RuleRow {
         };
         let annotations: HashMap<String, String> =
             serde_json::from_value(self.annotations).unwrap_or_default();
+        let notifier_ids: Vec<String> =
+            serde_json::from_value(self.notifier_ids).unwrap_or_default();
 
         Some(Rule {
             id: self.id,
@@ -67,6 +70,7 @@ impl RuleRow {
             for_duration_ms: self.for_duration_ms,
             severity,
             annotations,
+            notifier_ids,
         })
     }
 }

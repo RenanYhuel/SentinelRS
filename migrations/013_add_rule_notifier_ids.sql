@@ -1,0 +1,2 @@
+ALTER TABLE alert_rules
+    ADD COLUMN IF NOT EXISTS notifier_ids JSONB NOT NULL DEFAULT '[]';

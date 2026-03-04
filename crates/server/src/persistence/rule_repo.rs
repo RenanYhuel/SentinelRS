@@ -13,13 +13,15 @@ impl RuleRepo {
 
     pub async fn insert(&self, r: &RuleRecord) -> Result<(), sqlx::Error> {
         let annotations = serde_json::to_value(&r.annotations).unwrap_or_default();
+        let notifier_ids = serde_json::to_value(&r.notifier_ids).unwrap_or_default();
         sqlx::query(
             r#"INSERT INTO alert_rules
                (id, name, agent_pattern, metric_name, condition, threshold,
-                for_duration_ms, severity, annotations, enabled, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                       to_timestamp($11::double precision / 1000),
-                       to_timestamp($12::double precision / 1000))
+                for_duration_ms, severity, annotations, enabled, notifier_ids,
+                created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                       to_timestamp($12::double precision / 1000),
+                       to_timestamp($13::double precision / 1000))
                ON CONFLICT (id) DO NOTHING"#,
         )
         .bind(&r.id)
@@ -32,6 +34,7 @@ impl RuleRepo {
         .bind(&r.severity)
         .bind(&annotations)
         .bind(r.enabled)
+        .bind(&notifier_ids)
         .bind(r.created_at_ms)
         .bind(r.updated_at_ms)
         .execute(&self.pool)
@@ -41,12 +44,14 @@ impl RuleRepo {
 
     pub async fn update(&self, r: &RuleRecord) -> Result<(), sqlx::Error> {
         let annotations = serde_json::to_value(&r.annotations).unwrap_or_default();
+        let notifier_ids = serde_json::to_value(&r.notifier_ids).unwrap_or_default();
         sqlx::query(
             r#"UPDATE alert_rules SET
                  name = $2, agent_pattern = $3, metric_name = $4,
                  condition = $5, threshold = $6, for_duration_ms = $7,
                  severity = $8, annotations = $9, enabled = $10,
-                 updated_at = to_timestamp($11::double precision / 1000)
+                 notifier_ids = $11,
+                 updated_at = to_timestamp($12::double precision / 1000)
                WHERE id = $1"#,
         )
         .bind(&r.id)
@@ -59,6 +64,7 @@ impl RuleRepo {
         .bind(&r.severity)
         .bind(&annotations)
         .bind(r.enabled)
+        .bind(&notifier_ids)
         .bind(r.updated_at_ms)
         .execute(&self.pool)
         .await?;
@@ -76,7 +82,7 @@ impl RuleRepo {
     pub async fn load_all(&self, store: &crate::store::RuleStore) -> Result<usize, sqlx::Error> {
         let rows = sqlx::query_as::<_, RuleRow>(
             "SELECT id, name, agent_pattern, metric_name, condition, threshold,
-                    for_duration_ms, severity, annotations, enabled,
+                    for_duration_ms, severity, annotations, enabled, notifier_ids,
                     EXTRACT(EPOCH FROM created_at)::bigint * 1000 AS created_at_ms,
                     EXTRACT(EPOCH FROM updated_at)::bigint * 1000 AS updated_at_ms
              FROM alert_rules",
@@ -88,6 +94,8 @@ impl RuleRepo {
         for row in rows {
             let annotations: std::collections::HashMap<String, String> =
                 serde_json::from_value(row.annotations).unwrap_or_default();
+            let notifier_ids: Vec<String> =
+                serde_json::from_value(row.notifier_ids).unwrap_or_default();
             store.insert(RuleRecord {
                 id: row.id,
                 name: row.name,
@@ -99,6 +107,7 @@ impl RuleRepo {
                 severity: row.severity,
                 annotations,
                 enabled: row.enabled,
+                notifier_ids,
                 created_at_ms: row.created_at_ms,
                 updated_at_ms: row.updated_at_ms,
             });
@@ -119,6 +128,7 @@ struct RuleRow {
     severity: String,
     annotations: serde_json::Value,
     enabled: bool,
+    notifier_ids: serde_json::Value,
     created_at_ms: i64,
     updated_at_ms: i64,
 }

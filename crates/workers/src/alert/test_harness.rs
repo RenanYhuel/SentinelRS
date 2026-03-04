@@ -72,6 +72,7 @@ mod tests {
             for_duration_ms: 0,
             severity: Severity::Warning,
             annotations: HashMap::new(),
+            notifier_ids: Vec::new(),
         }
     }
 
@@ -210,6 +211,7 @@ mod tests {
             for_duration_ms: 0,
             severity: Severity::Critical,
             annotations: HashMap::new(),
+            notifier_ids: Vec::new(),
         };
 
         let samples = vec![

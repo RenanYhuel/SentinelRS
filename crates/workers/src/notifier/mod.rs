@@ -1,5 +1,6 @@
 pub mod channel;
 pub mod discord;
+pub mod dispatcher;
 pub mod dlq;
 pub mod retry;
 pub mod signer;
