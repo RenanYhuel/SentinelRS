@@ -289,4 +289,3 @@ mod tests {
         assert!(validate_ntfy(&cfg).is_err());
     }
 }
-

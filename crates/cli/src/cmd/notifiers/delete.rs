@@ -29,7 +29,9 @@ pub async fn run(args: DeleteArgs, mode: OutputMode, server: Option<String>) -> 
         OutputMode::Json => None,
     };
 
-    let status = api.delete_path(&format!("/v1/notifiers/{}", args.id)).await?;
+    let status = api
+        .delete_path(&format!("/v1/notifiers/{}", args.id))
+        .await?;
 
     if let Some(sp) = sp {
         spinner::finish_ok(&sp, &format!("Notifier '{}' deleted", args.id));

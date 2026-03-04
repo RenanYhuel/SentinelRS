@@ -83,9 +83,7 @@ pub async fn notification_stats(
     }))
 }
 
-fn to_response(
-    r: crate::persistence::NotificationHistoryRecord,
-) -> HistoryEntryResponse {
+fn to_response(r: crate::persistence::NotificationHistoryRecord) -> HistoryEntryResponse {
     HistoryEntryResponse {
         id: r.id,
         alert_id: r.alert_id,

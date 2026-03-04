@@ -24,7 +24,9 @@ pub async fn run(args: UpdateArgs, mode: OutputMode, server: Option<String>) -> 
 
     let name = match args.name {
         Some(n) => Some(n),
-        None if mode == OutputMode::Human => input::text_optional("New name (press Enter to keep)")?,
+        None if mode == OutputMode::Human => {
+            input::text_optional("New name (press Enter to keep)")?
+        }
         None => None,
     };
 

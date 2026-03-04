@@ -4,11 +4,11 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 use super::{
-    agents, alerts, cluster, health, key_rotation, metrics, notification_history, notifier_configs,
-    notifiers, provisioning, rules,
+    agent_metrics, agents, alerts, cluster, health, key_rotation, metrics, notification_history,
+    notifier_configs, notifiers, provisioning, rules,
 };
 use crate::metrics::server_metrics::ServerMetrics;
-use crate::persistence::{NotificationHistoryRepo, NotifierRepo, RuleRepo};
+use crate::persistence::{MetricsQueryRepo, NotificationHistoryRepo, NotifierRepo, RuleRepo};
 use crate::provisioning::TokenStore;
 use crate::store::{AgentStore, RuleStore};
 use crate::stream::{PresenceEventBus, SessionRegistry};
@@ -20,6 +20,7 @@ pub struct AppState {
     pub rule_repo: Option<Arc<RuleRepo>>,
     pub notifier_repo: Option<Arc<NotifierRepo>>,
     pub history_repo: Option<Arc<NotificationHistoryRepo>>,
+    pub metrics_repo: Option<Arc<MetricsQueryRepo>>,
     pub jwt_secret: Vec<u8>,
     pub metrics: Arc<ServerMetrics>,
     pub pool: Option<PgPool>,
@@ -78,10 +79,40 @@ pub fn router(state: AppState) -> Router {
             "/v1/notifications/stats",
             get(notification_history::notification_stats),
         )
+        .route(
+            "/v1/metrics/agents/:agent_id/latest",
+            get(agent_metrics::latest_metrics),
+        )
+        .route(
+            "/v1/metrics/agents/:agent_id/history",
+            get(agent_metrics::metric_history),
+        )
+        .route(
+            "/v1/metrics/agents/:agent_id/names",
+            get(agent_metrics::metric_names),
+        )
+        .route(
+            "/v1/metrics/agents/:agent_id/aggregates",
+            get(agent_metrics::metric_aggregates),
+        )
+        .route(
+            "/v1/metrics/agents/:agent_id/percentiles",
+            get(agent_metrics::metric_percentiles),
+        )
+        .route(
+            "/v1/metrics/agents/:agent_id/top",
+            get(agent_metrics::top_metrics),
+        )
+        .route(
+            "/v1/metrics/agents/:agent_id/export",
+            get(agent_metrics::export_metrics),
+        )
+        .route("/v1/metrics/summary", get(agent_metrics::fleet_summary))
+        .route("/v1/metrics/compare", get(agent_metrics::compare_agents))
+        .route("/v1/metrics/heatmap", get(agent_metrics::heatmap))
         .route("/v1/cluster/status", get(cluster::cluster_status))
         .route("/v1/cluster/agents", get(cluster::agent_ids))
         .route("/v1/cluster/events", get(cluster::cluster_events))
         .route("/v1/agents/:agent_id/live", get(cluster::agent_live))
         .with_state(state)
 }
-

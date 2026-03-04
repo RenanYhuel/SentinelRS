@@ -15,6 +15,7 @@ fn app_state() -> AppState {
         rule_repo: None,
         notifier_repo: None,
         history_repo: None,
+        metrics_repo: None,
         jwt_secret: b"test-secret".to_vec(),
         metrics: ServerMetrics::new(),
         pool: None,

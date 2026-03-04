@@ -10,7 +10,9 @@ use sentinel_server::config::ServerConfig;
 use sentinel_server::grpc::AgentServiceImpl;
 use sentinel_server::metrics::server_metrics::ServerMetrics;
 use sentinel_server::migration;
-use sentinel_server::persistence::{AgentRepo, NotificationHistoryRepo, NotifierRepo, RuleRepo};
+use sentinel_server::persistence::{
+    AgentRepo, MetricsQueryRepo, NotificationHistoryRepo, NotifierRepo, RuleRepo,
+};
 use sentinel_server::provisioning::TokenStore;
 use sentinel_server::rest::{self, AppState};
 use sentinel_server::store::{AgentStore, IdempotencyStore, RuleStore};
@@ -31,38 +33,47 @@ async fn main() {
 
     let config = ServerConfig::from_env_and_args();
 
-    let (pool, agent_repo, rule_repo, notifier_repo, history_repo) = match config.database_url {
-        Some(ref url) => {
-            let sw = logging::stopwatch();
-            let health_config = migration::HealthConfig::default();
-            let pool = migration::wait_for_db(url, 10, &health_config)
-                .await
-                .unwrap_or_else(|e| {
-                    tracing::error!(target: "db", error = %e, "Database health check failed");
-                    std::process::exit(1);
-                });
-            tracing::info!(target: "db", "Database connected{sw}");
+    let (pool, agent_repo, rule_repo, notifier_repo, history_repo, metrics_qrepo) =
+        match config.database_url {
+            Some(ref url) => {
+                let sw = logging::stopwatch();
+                let health_config = migration::HealthConfig::default();
+                let pool = migration::wait_for_db(url, 10, &health_config)
+                    .await
+                    .unwrap_or_else(|e| {
+                        tracing::error!(target: "db", error = %e, "Database health check failed");
+                        std::process::exit(1);
+                    });
+                tracing::info!(target: "db", "Database connected{sw}");
 
-            match migration::run(&pool).await {
-                Ok(0) => tracing::info!(target: "db", "Schema up to date"),
-                Ok(n) => tracing::info!(target: "db", count = n, "Auto-migration completed"),
-                Err(e) => {
-                    tracing::error!(target: "db", error = %e, "Auto-migration failed");
-                    std::process::exit(1);
+                match migration::run(&pool).await {
+                    Ok(0) => tracing::info!(target: "db", "Schema up to date"),
+                    Ok(n) => tracing::info!(target: "db", count = n, "Auto-migration completed"),
+                    Err(e) => {
+                        tracing::error!(target: "db", error = %e, "Auto-migration failed");
+                        std::process::exit(1);
+                    }
                 }
-            }
 
-            let repo = Arc::new(AgentRepo::new(pool.clone()));
-            let r_repo = Arc::new(RuleRepo::new(pool.clone()));
-            let n_repo = Arc::new(NotifierRepo::new(pool.clone()));
-            let h_repo = Arc::new(NotificationHistoryRepo::new(pool.clone()));
-            (Some(pool), Some(repo), Some(r_repo), Some(n_repo), Some(h_repo))
-        }
-        None => {
-            tracing::warn!(target: "db", "No DATABASE_URL — in-memory mode");
-            (None, None, None, None, None)
-        }
-    };
+                let repo = Arc::new(AgentRepo::new(pool.clone()));
+                let r_repo = Arc::new(RuleRepo::new(pool.clone()));
+                let n_repo = Arc::new(NotifierRepo::new(pool.clone()));
+                let h_repo = Arc::new(NotificationHistoryRepo::new(pool.clone()));
+                let m_repo = Arc::new(MetricsQueryRepo::new(pool.clone()));
+                (
+                    Some(pool),
+                    Some(repo),
+                    Some(r_repo),
+                    Some(n_repo),
+                    Some(h_repo),
+                    Some(m_repo),
+                )
+            }
+            None => {
+                tracing::warn!(target: "db", "No DATABASE_URL — in-memory mode");
+                (None, None, None, None, None, None)
+            }
+        };
 
     let sw = logging::stopwatch();
     let js = connect_jetstream(&config.nats_url)
@@ -166,6 +177,7 @@ async fn main() {
         rule_repo,
         notifier_repo,
         history_repo,
+        metrics_repo: metrics_qrepo,
         jwt_secret: config.jwt_secret,
         metrics: server_metrics,
         pool,

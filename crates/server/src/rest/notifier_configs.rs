@@ -204,4 +204,3 @@ pub async fn delete_notifier_config(
         }
     }
 }
-

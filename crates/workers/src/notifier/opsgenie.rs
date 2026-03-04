@@ -40,11 +40,7 @@ impl Notifier for OpsGenieNotifier {
 }
 
 impl OpsGenieNotifier {
-    async fn create_alert(
-        &self,
-        event: &AlertEvent,
-        priority: &str,
-    ) -> Result<(), NotifyError> {
+    async fn create_alert(&self, event: &AlertEvent, priority: &str) -> Result<(), NotifyError> {
         let payload = serde_json::json!({
             "message": format!("[{}] {} - {}", event.severity_str(), event.rule_name, event.agent_id),
             "alias": event.fingerprint,

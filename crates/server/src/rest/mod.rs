@@ -1,3 +1,4 @@
+mod agent_metrics;
 mod agent_queries;
 mod agents;
 mod alerts;

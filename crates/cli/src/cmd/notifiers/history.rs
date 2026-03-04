@@ -54,7 +54,9 @@ pub async fn run(args: HistoryArgs, mode: OutputMode, server: Option<String>) ->
                 return Ok(());
             }
 
-            theme::print_table_header(&["ID", "Alert", "Notifier", "Type", "Status", "Attempts", "Duration"]);
+            theme::print_table_header(&[
+                "ID", "Alert", "Notifier", "Type", "Status", "Attempts", "Duration",
+            ]);
             for e in arr {
                 theme::print_table_row(&[
                     &truncate(e["id"].as_str().unwrap_or("-"), 8),

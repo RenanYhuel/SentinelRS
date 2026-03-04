@@ -46,10 +46,7 @@ impl Notifier for TelegramNotifier {
             threshold = event.threshold,
         );
 
-        let url = format!(
-            "https://api.telegram.org/bot{}/sendMessage",
-            self.bot_token
-        );
+        let url = format!("https://api.telegram.org/bot{}/sendMessage", self.bot_token);
 
         let payload = serde_json::json!({
             "chat_id": self.chat_id,

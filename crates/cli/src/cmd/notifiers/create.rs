@@ -87,10 +87,7 @@ pub async fn run(args: CreateArgs, mode: OutputMode, server: Option<String>) -> 
     Ok(())
 }
 
-fn build_config_interactive(
-    ntype: &str,
-    secret: Option<&str>,
-) -> Result<serde_json::Value> {
+fn build_config_interactive(ntype: &str, secret: Option<&str>) -> Result<serde_json::Value> {
     match ntype {
         "webhook" => {
             let url = input::text_required("Webhook URL")?;
@@ -203,4 +200,3 @@ fn build_config(ntype: &str, target: &str, secret: Option<&str>) -> serde_json::
         _ => serde_json::json!({ "url": target }),
     }
 }
-
