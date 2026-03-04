@@ -1,28 +1,15 @@
-FROM rust:bookworm AS builder
-
+FROM lukemathwalker/cargo-chef:latest-rust-bookworm AS chef
 RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /build
 
-COPY Cargo.toml Cargo.toml
-COPY crates/common crates/common
-COPY crates/agent crates/agent
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-RUN mkdir -p crates/server/src crates/workers/src crates/cli/src \
-    && echo "fn main() {}" > crates/server/src/main.rs \
-    && echo "" > crates/server/src/lib.rs \
-    && echo "fn main() {}" > crates/workers/src/main.rs \
-    && echo "" > crates/workers/src/lib.rs \
-    && echo "fn main() {}" > crates/cli/src/main.rs
-
-COPY crates/server/Cargo.toml crates/server/Cargo.toml
-COPY crates/workers/Cargo.toml crates/workers/Cargo.toml
-COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
-
-RUN cargo build --release --package sentinel_agent 2>/dev/null || true
-
-COPY crates/agent crates/agent
-
+FROM chef AS builder
+COPY --from=planner /build/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+COPY . .
 RUN cargo build --release --package sentinel_agent
 
 FROM debian:bookworm-slim AS runtime
@@ -34,8 +21,6 @@ RUN apt-get update \
 RUN groupadd -r sentinel && useradd -r -g sentinel -s /sbin/nologin sentinel
 
 COPY --from=builder /build/target/release/sentinel_agent /usr/local/bin/sentinel_agent
-
-RUN chmod +x /usr/local/bin/sentinel_agent
 
 RUN mkdir -p /etc/sentinel /var/lib/sentinel/wal && chown -R sentinel:sentinel /etc/sentinel /var/lib/sentinel
 
