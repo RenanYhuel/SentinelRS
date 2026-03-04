@@ -1,8 +1,11 @@
+mod agent_health;
 mod agent_metrics;
 mod agent_queries;
+mod agent_types;
 mod agents;
 mod alerts;
 mod cluster;
+mod fleet;
 mod health;
 mod key_rotation;
 mod metrics;

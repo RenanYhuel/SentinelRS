@@ -2,8 +2,10 @@ mod add;
 mod delete;
 mod generate_install;
 mod get;
+mod health;
 mod list;
 mod live;
+mod status;
 
 use anyhow::Result;
 use clap::Subcommand;
@@ -24,6 +26,10 @@ pub enum AgentsCmd {
     Delete(delete::DeleteArgs),
     #[command(about = "Generate a one-line install command")]
     GenerateInstall(generate_install::GenerateArgs),
+    #[command(about = "Fleet overview with status counts", visible_alias = "st")]
+    Status,
+    #[command(about = "Detailed health for a specific agent")]
+    Health(health::HealthArgs),
 }
 
 pub async fn execute(cmd: AgentsCmd, mode: OutputMode, server: Option<String>) -> Result<()> {
@@ -34,5 +40,7 @@ pub async fn execute(cmd: AgentsCmd, mode: OutputMode, server: Option<String>) -
         AgentsCmd::Live(args) => live::run(args, mode, server).await,
         AgentsCmd::Delete(args) => delete::run(args, mode, server).await,
         AgentsCmd::GenerateInstall(args) => generate_install::run(args, mode, server).await,
+        AgentsCmd::Status => status::run(mode, server).await,
+        AgentsCmd::Health(args) => health::run(args, mode, server).await,
     }
 }

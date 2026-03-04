@@ -1,40 +1,14 @@
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{DateTime, Utc};
-use serde::Serialize;
 
 use super::agent_queries;
+use super::agent_types::{self, AgentSummary};
 use crate::rest::AppState;
-
-#[derive(Serialize, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum AgentStatus {
-    Online,
-    Offline,
-}
-
-#[derive(Serialize)]
-pub struct AgentSummary {
-    pub agent_id: String,
-    pub hw_id: String,
-    pub agent_version: String,
-    pub registered_at_ms: i64,
-    pub last_seen: Option<DateTime<Utc>>,
-    pub status: AgentStatus,
-}
 
 pub async fn list_agents(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AgentSummary>>, StatusCode> {
-    let resolve_status = |id: &str| -> AgentStatus {
-        if state.registry.contains(id) {
-            AgentStatus::Online
-        } else {
-            AgentStatus::Offline
-        }
-    };
-
     if let Some(ref pool) = state.pool {
         let rows = agent_queries::fetch_all(pool).await.map_err(|e| {
             tracing::error!(error = %e, "failed to fetch agents from database");
@@ -42,17 +16,7 @@ pub async fn list_agents(
         })?;
         let agents = rows
             .into_iter()
-            .map(|r| {
-                let status = resolve_status(&r.agent_id);
-                AgentSummary {
-                    agent_id: r.agent_id,
-                    hw_id: r.hw_id,
-                    agent_version: r.agent_version,
-                    registered_at_ms: r.registered_at_ms,
-                    last_seen: r.last_seen,
-                    status,
-                }
-            })
+            .map(|r| agent_types::enrich(r, &state.registry))
             .collect();
         return Ok(Json(agents));
     }
@@ -62,15 +26,14 @@ pub async fn list_agents(
         .list()
         .into_iter()
         .map(|r| {
-            let status = resolve_status(&r.agent_id);
-            AgentSummary {
+            let row = agent_queries::AgentSummaryRow {
                 agent_id: r.agent_id,
                 hw_id: r.hw_id,
                 agent_version: r.agent_version,
                 registered_at_ms: r.registered_at_ms,
                 last_seen: r.last_seen,
-                status,
-            }
+            };
+            agent_types::enrich(row, &state.registry)
         })
         .collect();
     Ok(Json(agents))
@@ -80,12 +43,6 @@ pub async fn get_agent(
     State(state): State<AppState>,
     axum::extract::Path(agent_id): axum::extract::Path<String>,
 ) -> Result<Json<AgentSummary>, StatusCode> {
-    let status = if state.registry.contains(&agent_id) {
-        AgentStatus::Online
-    } else {
-        AgentStatus::Offline
-    };
-
     if let Some(ref pool) = state.pool {
         let row = agent_queries::fetch_one(pool, &agent_id)
             .await
@@ -94,28 +51,21 @@ pub async fn get_agent(
                 StatusCode::INTERNAL_SERVER_ERROR
             })?
             .ok_or(StatusCode::NOT_FOUND)?;
-        return Ok(Json(AgentSummary {
-            agent_id: row.agent_id,
-            hw_id: row.hw_id,
-            agent_version: row.agent_version,
-            registered_at_ms: row.registered_at_ms,
-            last_seen: row.last_seen,
-            status,
-        }));
+        return Ok(Json(agent_types::enrich(row, &state.registry)));
     }
 
     state
         .agents
         .get(&agent_id)
         .map(|r| {
-            Json(AgentSummary {
+            let row = agent_queries::AgentSummaryRow {
                 agent_id: r.agent_id,
                 hw_id: r.hw_id,
                 agent_version: r.agent_version,
                 registered_at_ms: r.registered_at_ms,
                 last_seen: r.last_seen,
-                status,
-            })
+            };
+            Json(agent_types::enrich(row, &state.registry))
         })
         .ok_or(StatusCode::NOT_FOUND)
 }

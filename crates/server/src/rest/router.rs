@@ -4,8 +4,8 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 use super::{
-    agent_metrics, agents, alerts, cluster, health, key_rotation, metrics, notification_history,
-    notifier_configs, notifiers, provisioning, rules,
+    agent_health, agent_metrics, agents, alerts, cluster, fleet, health, key_rotation, metrics,
+    notification_history, notifier_configs, notifiers, provisioning, rules,
 };
 use crate::metrics::server_metrics::ServerMetrics;
 use crate::persistence::{MetricsQueryRepo, NotificationHistoryRepo, NotifierRepo, RuleRepo};
@@ -39,9 +39,14 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/agents", get(agents::list_agents))
         .route("/v1/agents/:agent_id", get(agents::get_agent))
         .route(
+            "/v1/agents/:agent_id/health",
+            get(agent_health::agent_health),
+        )
+        .route(
             "/v1/agents/:agent_id/rotate-key",
             post(key_rotation::rotate_key),
         )
+        .route("/v1/fleet/overview", get(fleet::fleet_overview))
         .route(
             "/v1/agents/generate-install",
             post(provisioning::generate_install),
