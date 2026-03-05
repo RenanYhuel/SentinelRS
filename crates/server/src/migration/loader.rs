@@ -77,5 +77,9 @@ pub fn load_all() -> Vec<MigrationFile> {
             filename: "017_metrics_5m_aggregate.sql",
             sql: include_str!("../../../../migrations/017_metrics_5m_aggregate.sql"),
         },
+        MigrationFile {
+            filename: "018_compatibility_views.sql",
+            sql: include_str!("../../../../migrations/018_compatibility_views.sql"),
+        },
     ]
 }

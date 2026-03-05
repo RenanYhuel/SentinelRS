@@ -64,7 +64,9 @@ async fn deploy_docker_agent(name: &str, token: &str, mode: OutputMode) -> Resul
     let container_name = format!("sentinel-{name}");
 
     let cfg = crate::store::load().unwrap_or_default();
-    let grpc_url = &cfg.server.grpc_url;
+    let server_url = &cfg.server.grpc_url;
+
+    cleanup_existing_container(&container_name).await;
 
     let sp = spinner::create(&format!("Deploying container '{container_name}'..."));
 
@@ -75,9 +77,13 @@ async fn deploy_docker_agent(name: &str, token: &str, mode: OutputMode) -> Resul
             "--name",
             &container_name,
             "-e",
-            &format!("SENTINEL_TOKEN={token}"),
+            &format!("BOOTSTRAP_TOKEN={token}"),
             "-e",
-            &format!("SENTINEL_GRPC_URL={grpc_url}"),
+            &format!("SERVER_URL={server_url}"),
+            "-v",
+            &format!("{container_name}-config:/etc/sentinel"),
+            "--network",
+            "sentinel-net",
             "--restart",
             "unless-stopped",
             "sentinelrs/agent:latest",
@@ -91,7 +97,7 @@ async fn deploy_docker_agent(name: &str, token: &str, mode: OutputMode) -> Resul
         Ok(s) if s.success() => {
             spinner::finish_ok(&sp, &format!("Agent '{name}' deployed"));
             if mode == OutputMode::Human {
-                wait_for_agent(name).await;
+                wait_for_agent(name, &container_name).await;
             }
         }
         _ => {
@@ -103,8 +109,34 @@ async fn deploy_docker_agent(name: &str, token: &str, mode: OutputMode) -> Resul
     Ok(())
 }
 
-async fn wait_for_agent(name: &str) {
+async fn cleanup_existing_container(container_name: &str) {
+    let _ = tokio::process::Command::new("docker")
+        .args(["rm", "-f", container_name])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .await;
+}
+
+async fn wait_for_agent(name: &str, container_name: &str) {
     let sp = spinner::create("Waiting for agent bootstrap...");
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-    spinner::finish_ok(&sp, &format!("Agent '{name}' is ONLINE"));
+
+    for _ in 0..10 {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        let output = tokio::process::Command::new("docker")
+            .args(["inspect", "-f", "{{.State.Running}}", container_name])
+            .output()
+            .await;
+
+        match output {
+            Ok(o) if String::from_utf8_lossy(&o.stdout).trim() == "true" => {
+                spinner::finish_ok(&sp, &format!("Agent '{name}' is running"));
+                return;
+            }
+            _ => continue,
+        }
+    }
+
+    spinner::finish_err(&sp, &format!("Agent '{name}' did not start in time"));
 }

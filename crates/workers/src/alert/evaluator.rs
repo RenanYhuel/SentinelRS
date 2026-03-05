@@ -12,6 +12,8 @@ pub struct Evaluator {
     states: Arc<DashMap<String, RuleState>>,
 }
 
+const MIN_SAMPLES: usize = 2;
+
 impl Evaluator {
     pub fn new(rules: Vec<Rule>) -> Self {
         Self {
@@ -47,6 +49,10 @@ impl Evaluator {
             }
 
             let fp = fingerprint_string(&rule.id, agent_id, &rule.metric_name);
+
+            if aggregator.count(agent_id, &rule.metric_name) < MIN_SAMPLES {
+                continue;
+            }
 
             let value = match aggregator.avg(agent_id, &rule.metric_name) {
                 Some(v) => v,
@@ -134,6 +140,7 @@ mod tests {
     #[test]
     fn fires_when_threshold_exceeded() {
         let agg = AggregatorStore::new(10000);
+        agg.ingest("agent-1", "cpu", 500, 90.0);
         agg.ingest("agent-1", "cpu", 1000, 90.0);
 
         let eval = Evaluator::new(vec![cpu_rule()]);
@@ -145,6 +152,7 @@ mod tests {
     #[test]
     fn no_event_below_threshold() {
         let agg = AggregatorStore::new(10000);
+        agg.ingest("agent-1", "cpu", 500, 50.0);
         agg.ingest("agent-1", "cpu", 1000, 50.0);
 
         let eval = Evaluator::new(vec![cpu_rule()]);
@@ -155,6 +163,7 @@ mod tests {
     #[test]
     fn fires_only_once() {
         let agg = AggregatorStore::new(10000);
+        agg.ingest("agent-1", "cpu", 500, 90.0);
         agg.ingest("agent-1", "cpu", 1000, 90.0);
 
         let eval = Evaluator::new(vec![cpu_rule()]);
@@ -169,6 +178,7 @@ mod tests {
     #[test]
     fn resolves_when_back_below() {
         let agg = AggregatorStore::new(10000);
+        agg.ingest("agent-1", "cpu", 500, 90.0);
         agg.ingest("agent-1", "cpu", 1000, 90.0);
 
         let eval = Evaluator::new(vec![cpu_rule()]);
@@ -197,7 +207,8 @@ mod tests {
         let mut rule = cpu_rule();
         rule.for_duration_ms = 5000;
 
-        let agg = AggregatorStore::new(10000);
+        let agg = AggregatorStore::new(20000);
+        agg.ingest("a", "cpu", 500, 90.0);
         agg.ingest("a", "cpu", 1000, 90.0);
 
         let eval = Evaluator::new(vec![rule]);

@@ -64,6 +64,14 @@ impl AggregatorStore {
         };
         self.series.get(&key).and_then(|s| s.last())
     }
+
+    pub fn count(&self, agent_id: &str, name: &str) -> usize {
+        let key = MetricKey {
+            agent_id: agent_id.to_string(),
+            name: name.to_string(),
+        };
+        self.series.get(&key).map(|s| s.count()).unwrap_or(0)
+    }
 }
 
 #[cfg(test)]

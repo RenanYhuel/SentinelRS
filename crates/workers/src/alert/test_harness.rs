@@ -103,6 +103,12 @@ mod tests {
             MetricSample {
                 agent_id: "a1".into(),
                 metric_name: "cpu".into(),
+                timestamp_ms: 500,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
                 timestamp_ms: 1000,
                 value: 90.0,
             },
@@ -148,6 +154,12 @@ mod tests {
             MetricSample {
                 agent_id: "a1".into(),
                 metric_name: "cpu".into(),
+                timestamp_ms: 500,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
                 timestamp_ms: 1000,
                 value: 90.0,
             },
@@ -162,6 +174,12 @@ mod tests {
         assert_eq!(result.firing_count, 0);
 
         let samples_long = vec![
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 500,
+                value: 90.0,
+            },
             MetricSample {
                 agent_id: "a1".into(),
                 metric_name: "cpu".into(),
@@ -182,6 +200,18 @@ mod tests {
     #[test]
     fn multi_agent_independent() {
         let samples = vec![
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 500,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a2".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 500,
+                value: 90.0,
+            },
             MetricSample {
                 agent_id: "a1".into(),
                 metric_name: "cpu".into(),
@@ -215,6 +245,18 @@ mod tests {
         };
 
         let samples = vec![
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "cpu".into(),
+                timestamp_ms: 500,
+                value: 90.0,
+            },
+            MetricSample {
+                agent_id: "a1".into(),
+                metric_name: "memory".into(),
+                timestamp_ms: 500,
+                value: 95.0,
+            },
             MetricSample {
                 agent_id: "a1".into(),
                 metric_name: "cpu".into(),

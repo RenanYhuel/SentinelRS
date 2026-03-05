@@ -10,7 +10,7 @@ impl AgentRepo {
     }
 
     pub async fn touch_last_seen(&self, agent_id: &str) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE agents SET last_seen = NOW() WHERE agent_id = $1")
+        sqlx::query("UPDATE agents SET last_seen = NOW(), status = 'online' WHERE agent_id = $1")
             .bind(agent_id)
             .execute(&self.pool)
             .await?;
