@@ -1,4 +1,5 @@
 mod agent_repo;
+mod health;
 pub mod migrator;
 mod notifier_loader;
 mod pool;
@@ -8,6 +9,7 @@ mod rule_loader;
 mod writer;
 
 pub use agent_repo::AgentRepo;
+pub use health::{wait_for_db, WaitConfig};
 pub use notifier_loader::{NotifierConfigLoader, NotifierConfigRow};
 pub use pool::create_pool;
 pub use raw_writer::RawWriter;

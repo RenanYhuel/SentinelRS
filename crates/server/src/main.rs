@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use sentinel_common::logging::{self, Component, LogConfig};
 use sentinel_common::nats_config::StreamConfig;
+use sentinel_common::pool_config::PoolConfig;
 use sentinel_common::proto::agent_service_server::AgentServiceServer;
 use sentinel_common::proto::sentinel_stream_server::SentinelStreamServer;
 
@@ -43,8 +44,9 @@ async fn main() {
     {
         Some(ref url) => {
             let sw = logging::stopwatch();
-            let health_config = migration::HealthConfig::default();
-            let pool = migration::wait_for_db(url, 10, &health_config)
+            let pool_config = PoolConfig::from_env();
+            let health_config = migration::HealthConfig::from_env();
+            let pool = migration::wait_for_db(url, &pool_config, &health_config)
                 .await
                 .unwrap_or_else(|e| {
                     tracing::error!(

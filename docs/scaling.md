@@ -51,6 +51,49 @@ All workers connect to the same NATS and TimescaleDB instances.
 | `BATCH_SIZE`      | `100`              | Rows per DB insert batch  |
 | `WORKER_API_ADDR` | `0.0.0.0:9090`     | Worker health API address |
 
+### Connection Pool
+
+Both the server and workers use configurable connection pools:
+
+| Variable                  | Default | Description                      |
+| ------------------------- | ------- | -------------------------------- |
+| `MAX_DB_CONNECTIONS`      | `10`    | Maximum pool connections         |
+| `MIN_DB_CONNECTIONS`      | `1`     | Minimum idle connections         |
+| `DB_IDLE_TIMEOUT_SECS`    | `300`   | Close idle connections after (s) |
+| `DB_ACQUIRE_TIMEOUT_SECS` | `5`     | Timeout waiting for a connection |
+| `DB_MAX_LIFETIME_SECS`    | `1800`  | Max connection lifetime (s)      |
+
+**Pool sizing formula:**
+
+```
+total_connections = (num_workers × MAX_DB_CONNECTIONS) + (num_servers × MAX_DB_CONNECTIONS) + overhead
+```
+
+Keep total below PostgreSQL's `max_connections` with ~10% headroom.
+
+### Database Boot Resilience
+
+TimescaleDB can take 30–90s on first Docker boot. The server uses a retry loop:
+
+| Variable                    | Default | Description                     |
+| --------------------------- | ------- | ------------------------------- |
+| `DB_WAIT_TIMEOUT_SECS`      | `120`   | Total deadline for DB readiness |
+| `DB_WAIT_RETRY_INTERVAL_MS` | `1000`  | Delay between retries           |
+| `DB_WAIT_MAX_RETRIES`       | `60`    | Maximum retry attempts          |
+
+### Worker Identity & Peer Discovery
+
+Each worker generates a unique ID at startup (`<hostname>-<uuid8>`). When `REGISTRY_ENABLED=true`, workers register in a NATS KV bucket and emit heartbeats. The `/status` endpoint lists known peers.
+
+### Scaling Guidelines
+
+| Agents   | Recommended Workers | DB Connections (total) |
+| -------- | ------------------- | ---------------------- |
+| 1–50     | 1–2                 | 10–20                  |
+| 50–500   | 2–4                 | 20–40                  |
+| 500–5000 | 4–8                 | 40–80                  |
+| 5000+    | 8+                  | 80+                    |
+
 ---
 
 ## NATS JetStream Tuning

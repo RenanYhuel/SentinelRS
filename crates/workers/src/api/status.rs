@@ -17,6 +17,7 @@ pub struct StatusResponse {
     pub uptime_secs: u64,
     pub circuit_breaker: CircuitBreakerStatus,
     pub pipeline: PipelineStatus,
+    pub pool: PoolStatus,
     pub peers: Vec<String>,
 }
 
@@ -38,6 +39,15 @@ pub struct PipelineStatus {
     pub messages_acked: u64,
     pub messages_nacked: u64,
     pub alerts_fired: u64,
+    pub notifications_sent: u64,
+    pub notifications_failed: u64,
+}
+
+#[derive(Serialize)]
+pub struct PoolStatus {
+    pub size: u32,
+    pub idle: u32,
+    pub active: u32,
 }
 
 pub async fn status(State(state): State<Arc<WorkerState>>) -> Json<StatusResponse> {
@@ -55,6 +65,9 @@ pub async fn status(State(state): State<Arc<WorkerState>>) -> Json<StatusRespons
         .unwrap_or_default();
 
     let in_flight = state.in_flight.load(Ordering::Relaxed);
+
+    let pool_size = state.pool.size();
+    let pool_idle = state.pool.num_idle() as u32;
 
     Json(StatusResponse {
         worker_id: state.identity.id().to_string(),
@@ -77,6 +90,13 @@ pub async fn status(State(state): State<Arc<WorkerState>>) -> Json<StatusRespons
             messages_acked: state.metrics.messages_acked_val(),
             messages_nacked: state.metrics.messages_nacked_val(),
             alerts_fired: state.metrics.alerts_fired_val(),
+            notifications_sent: state.metrics.notifications_sent_val(),
+            notifications_failed: state.metrics.notifications_failed_val(),
+        },
+        pool: PoolStatus {
+            size: pool_size,
+            idle: pool_idle,
+            active: pool_size.saturating_sub(pool_idle),
         },
         peers,
     })

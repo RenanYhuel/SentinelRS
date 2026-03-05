@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use sentinel_common::logging::{self, Component, LogConfig};
 use sentinel_common::nats_config::StreamConfig;
+use sentinel_common::pool_config::PoolConfig;
 use sentinel_common::trace_id::generate_trace_id;
 use sentinel_workers::api;
 use sentinel_workers::api::state::WorkerState;
@@ -15,7 +16,7 @@ use sentinel_workers::ingestion::{AlertEngine, IngestPipeline};
 use sentinel_workers::metrics::worker_metrics::WorkerMetrics;
 use sentinel_workers::registry::WorkerRegistry;
 use sentinel_workers::shutdown::spawn_signal_handler;
-use sentinel_workers::storage::{create_pool, migrator};
+use sentinel_workers::storage::{migrator, wait_for_db, WaitConfig};
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument;
 
@@ -40,7 +41,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     spawn_signal_handler(cancel.clone());
 
     let sw = logging::stopwatch();
-    let pool = match create_pool(&config.database_url, config.max_db_connections).await {
+    let pool_config = PoolConfig::from_env();
+    let wait_config = WaitConfig::from_env();
+    let pool = match wait_for_db(&config.database_url, &pool_config, &wait_config).await {
         Ok(p) => p,
         Err(e) => {
             tracing::error!(
@@ -82,6 +85,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             None
         }
     };
+
+    let api_pool = pool.clone();
 
     let pipeline = {
         let p = IngestPipeline::new(pool, worker_metrics.clone());
@@ -148,6 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         semaphore: Arc::clone(&semaphore),
         in_flight: Arc::clone(&in_flight),
         registry,
+        pool: api_pool,
     });
 
     let api_addr = config.api_addr.clone();

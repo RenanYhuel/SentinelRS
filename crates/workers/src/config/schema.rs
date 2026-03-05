@@ -3,7 +3,6 @@ use std::time::Duration;
 #[derive(Debug, Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
-    pub max_db_connections: u32,
     pub nats_url: String,
     pub batch_size: usize,
     pub api_addr: String,
@@ -94,7 +93,6 @@ impl WorkerConfig {
 
         Self {
             database_url: std::env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
-            max_db_connections: env_parse("MAX_DB_CONNECTIONS", 10),
             nats_url: env_or("NATS_URL", "nats://127.0.0.1:4222"),
             batch_size: env_parse("BATCH_SIZE", 50),
             api_addr: env_or("WORKER_API_ADDR", "0.0.0.0:9090"),

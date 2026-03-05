@@ -1,6 +1,8 @@
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
+use sqlx::PgPool;
+
 use crate::backpressure::{BatchSemaphore, CircuitBreaker};
 use crate::identity::WorkerIdentity;
 use crate::metrics::worker_metrics::WorkerMetrics;
@@ -13,4 +15,5 @@ pub struct WorkerState {
     pub semaphore: Arc<BatchSemaphore>,
     pub in_flight: Arc<AtomicU64>,
     pub registry: Option<Arc<WorkerRegistry>>,
+    pub pool: PgPool,
 }

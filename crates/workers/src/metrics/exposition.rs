@@ -1,8 +1,9 @@
 use super::worker_metrics::WorkerMetrics;
+use sqlx::PgPool;
 use std::sync::Arc;
 
-pub fn render_prometheus(m: &Arc<WorkerMetrics>, worker_id: &str) -> String {
-    let mut out = String::with_capacity(1024);
+pub fn render_prometheus(m: &Arc<WorkerMetrics>, worker_id: &str, pool: &PgPool) -> String {
+    let mut out = String::with_capacity(2048);
 
     write_counter(
         &mut out,
@@ -71,12 +72,31 @@ pub fn render_prometheus(m: &Arc<WorkerMetrics>, worker_id: &str) -> String {
         worker_id,
     );
 
+    write_gauge(
+        &mut out,
+        "sentinel_worker_pool_size",
+        u64::from(pool.size()),
+        worker_id,
+    );
+    write_gauge(
+        &mut out,
+        "sentinel_worker_pool_idle",
+        pool.num_idle() as u64,
+        worker_id,
+    );
+
     out
 }
 
 fn write_counter(out: &mut String, name: &str, val: u64, worker_id: &str) {
     use std::fmt::Write;
     let _ = writeln!(out, "# TYPE {name} counter");
+    let _ = writeln!(out, "{name}{{worker=\"{worker_id}\"}} {val}");
+}
+
+fn write_gauge(out: &mut String, name: &str, val: u64, worker_id: &str) {
+    use std::fmt::Write;
+    let _ = writeln!(out, "# TYPE {name} gauge");
     let _ = writeln!(out, "{name}{{worker=\"{worker_id}\"}} {val}");
 }
 
