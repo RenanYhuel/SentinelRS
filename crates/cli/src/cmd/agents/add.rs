@@ -65,12 +65,7 @@ async fn deploy_docker_agent(name: &str, token: &str, mode: OutputMode) -> Resul
 
     let cfg = crate::store::load().unwrap_or_default();
     let server_url = &cfg.server.grpc_url;
-    let project = if cfg.docker.project_name.is_empty() {
-        "sentinel".to_string()
-    } else {
-        cfg.docker.project_name.clone()
-    };
-    let network = format!("{project}_sentinel-net");
+    let network = resolve_compose_network(&cfg);
 
     cleanup_existing_container(&container_name).await;
 
@@ -151,4 +146,19 @@ async fn wait_for_agent(name: &str, container_name: &str) {
     }
 
     spinner::finish_err(&sp, &format!("Agent '{name}' did not start in time"));
+}
+
+fn resolve_compose_network(cfg: &crate::store::config::CliConfig) -> String {
+    if !cfg.docker.compose_file.is_empty() {
+        if let Some(parent) = std::path::Path::new(&cfg.docker.compose_file).parent() {
+            let dir_name = parent
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("deploy");
+            if !dir_name.is_empty() && dir_name != "." {
+                return format!("{dir_name}_sentinel-net");
+            }
+        }
+    }
+    "deploy_sentinel-net".to_string()
 }
