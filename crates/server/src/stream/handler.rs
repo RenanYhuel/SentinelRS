@@ -158,7 +158,7 @@ async fn run_stream<B: BrokerPublisher>(
     )
     .await?;
 
-    tracing::info!(target: "conn", agent_id = %agent_id, "Stream authenticated");
+    tracing::info!(target: "conn", %agent_id, "Stream authenticated");
 
     let version = registry
         .snapshot(&agent_id)
@@ -206,7 +206,7 @@ async fn run_stream<B: BrokerPublisher>(
         at: Utc::now(),
     });
 
-    tracing::info!(target: "conn", agent_id = %agent_id, "Stream disconnected");
+    tracing::info!(target: "conn", %agent_id, duration_ms = duration_ms, "Stream disconnected");
 
     result
 }

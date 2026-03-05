@@ -29,79 +29,115 @@ async fn main() {
     logging::print_banner(Component::Server, env!("CARGO_PKG_VERSION"));
     logging::init(&log_config);
 
-    tracing::info!(target: "system", "Starting SentinelRS Server v{}", env!("CARGO_PKG_VERSION"));
+    tracing::info!(
+        target: "system",
+        version = env!("CARGO_PKG_VERSION"),
+        pid = std::process::id(),
+        "Starting SentinelRS Server"
+    );
 
     let config = ServerConfig::from_env_and_args();
 
-    let (pool, agent_repo, rule_repo, notifier_repo, history_repo, metrics_qrepo) =
-        match config.database_url {
-            Some(ref url) => {
-                let sw = logging::stopwatch();
-                let health_config = migration::HealthConfig::default();
-                let pool = migration::wait_for_db(url, 10, &health_config)
-                    .await
-                    .unwrap_or_else(|e| {
-                        tracing::error!(target: "db", error = %e, "Database health check failed");
-                        std::process::exit(1);
-                    });
-                tracing::info!(target: "db", "Database connected{sw}");
+    let (pool, agent_repo, rule_repo, notifier_repo, history_repo, metrics_qrepo) = match config
+        .database_url
+    {
+        Some(ref url) => {
+            let sw = logging::stopwatch();
+            let health_config = migration::HealthConfig::default();
+            let pool = migration::wait_for_db(url, 10, &health_config)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::error!(
+                        target: "db",
+                        error = %e,
+                        "{}",
+                        sentinel_common::logging::actionable::db_unreachable(url, &e)
+                    );
+                    std::process::exit(1);
+                });
+            tracing::info!(target: "db", "Database connected{sw}");
 
-                match migration::run(&pool).await {
-                    Ok(0) => tracing::info!(target: "db", "Schema up to date"),
-                    Ok(n) => tracing::info!(target: "db", count = n, "Auto-migration completed"),
-                    Err(e) => {
-                        tracing::error!(target: "db", error = %e, "Auto-migration failed");
-                        std::process::exit(1);
-                    }
+            match migration::run(&pool).await {
+                Ok(0) => tracing::info!(target: "db", "Schema up to date"),
+                Ok(n) => tracing::info!(target: "db", count = n, "Migrations applied"),
+                Err(e) => {
+                    tracing::error!(
+                        target: "db",
+                        error = %e,
+                        "{}",
+                        sentinel_common::logging::actionable::migration_failed("auto", &e)
+                    );
+                    std::process::exit(1);
                 }
+            }
 
-                let repo = Arc::new(AgentRepo::new(pool.clone()));
-                let r_repo = Arc::new(RuleRepo::new(pool.clone()));
-                let n_repo = Arc::new(NotifierRepo::new(pool.clone()));
-                let h_repo = Arc::new(NotificationHistoryRepo::new(pool.clone()));
-                let m_repo = Arc::new(MetricsQueryRepo::new(pool.clone()));
-                (
-                    Some(pool),
-                    Some(repo),
-                    Some(r_repo),
-                    Some(n_repo),
-                    Some(h_repo),
-                    Some(m_repo),
-                )
-            }
-            None => {
-                tracing::warn!(target: "db", "No DATABASE_URL — in-memory mode");
-                (None, None, None, None, None, None)
-            }
-        };
+            let repo = Arc::new(AgentRepo::new(pool.clone()));
+            let r_repo = Arc::new(RuleRepo::new(pool.clone()));
+            let n_repo = Arc::new(NotifierRepo::new(pool.clone()));
+            let h_repo = Arc::new(NotificationHistoryRepo::new(pool.clone()));
+            let m_repo = Arc::new(MetricsQueryRepo::new(pool.clone()));
+            (
+                Some(pool),
+                Some(repo),
+                Some(r_repo),
+                Some(n_repo),
+                Some(h_repo),
+                Some(m_repo),
+            )
+        }
+        None => {
+            tracing::warn!(target: "db", "No DATABASE_URL — running in-memory mode (data will not persist across restarts)");
+            (None, None, None, None, None, None)
+        }
+    };
 
     let sw = logging::stopwatch();
     let js = connect_jetstream(&config.nats_url)
         .await
-        .expect("NATS JetStream connection failed");
-    tracing::info!(target: "net", "NATS JetStream connected ({}){sw}", config.nats_url);
+        .unwrap_or_else(|e| {
+            tracing::error!(
+                target: "net",
+                error = %e,
+                "{}",
+                sentinel_common::logging::actionable::nats_unreachable(&config.nats_url, &e)
+            );
+            std::process::exit(1);
+        });
+    tracing::info!(target: "net", nats_url = %config.nats_url, "NATS JetStream connected{sw}");
 
     let stream_config = StreamConfig::default();
     ensure_stream(&js, &stream_config)
         .await
         .expect("NATS stream creation failed");
-    tracing::info!(target: "net", "Stream '{}' ready", stream_config.name);
+    tracing::info!(target: "net", stream = %stream_config.name, "Stream ready");
 
     let agents = AgentStore::new();
     let rules = RuleStore::new();
     let server_metrics = ServerMetrics::new();
 
     if let Some(ref repo) = agent_repo {
+        let lat = logging::track("load_agents");
         match repo.load_all(&agents).await {
-            Ok(n) => tracing::info!(target: "data", count = n, "Loaded agents from database"),
-            Err(e) => tracing::error!(target: "data", error = %e, "Failed to load agents"),
+            Ok(n) => {
+                lat.finish_with_count(n as u64);
+                tracing::info!(target: "data", count = n, "Loaded agents from database");
+            }
+            Err(e) => {
+                tracing::error!(target: "data", error = %e, "Failed to load agents — agent state may be incomplete")
+            }
         }
     }
 
     if let Some(ref repo) = rule_repo {
+        let lat = logging::track("load_rules");
         match repo.load_all(&rules).await {
-            Ok(n) => tracing::info!(target: "data", count = n, "Loaded alert rules from database"),
-            Err(e) => tracing::error!(target: "data", error = %e, "Failed to load alert rules"),
+            Ok(n) => {
+                lat.finish_with_count(n as u64);
+                tracing::info!(target: "data", count = n, "Loaded alert rules from database");
+            }
+            Err(e) => {
+                tracing::error!(target: "data", error = %e, "Failed to load alert rules — alerting may be incomplete")
+            }
         }
     }
 
@@ -109,6 +145,10 @@ async fn main() {
         .tls
         .as_ref()
         .map(|tls_cfg| TlsIdentity::load(tls_cfg).expect("TLS certificate load failed"));
+
+    if tls_identity.is_some() {
+        tracing::info!(target: "auth", "TLS enabled");
+    }
 
     let idempotency = IdempotencyStore::new();
     let broker = Arc::new(NatsPublisher::new(js));
@@ -158,7 +198,7 @@ async fn main() {
         .map(|id| id.tonic_server_tls().expect("gRPC TLS config build failed"));
 
     let grpc_handle = tokio::spawn(async move {
-        tracing::info!(target: "net", "gRPC listening on {grpc_addr} (V1 + V2 streaming)");
+        tracing::info!(target: "net", addr = %grpc_addr, "gRPC listening (V1 + V2 streaming)");
         let mut builder = TonicServer::builder();
         if let Some(tls) = grpc_tls {
             builder = builder.tls_config(tls).expect("invalid gRPC TLS config");
@@ -190,15 +230,20 @@ async fn main() {
     let rest_addr = config.rest_addr;
 
     let rest_handle = tokio::spawn(async move {
-        tracing::info!(target: "net", "REST API listening on {rest_addr}");
+        tracing::info!(target: "rest", addr = %rest_addr, "REST API listening");
         let listener = tokio::net::TcpListener::bind(rest_addr).await.unwrap();
         axum::serve(listener, rest_app).await.unwrap();
     });
 
-    tracing::info!(target: "system", "Server ready");
+    tracing::info!(
+        target: "system",
+        grpc = %config.grpc_addr,
+        rest = %config.rest_addr,
+        "Server ready — accepting connections"
+    );
 
     tokio::select! {
-        r = grpc_handle => { if let Err(e) = r { tracing::error!(target: "net", "gRPC: {e}"); } }
-        r = rest_handle => { if let Err(e) = r { tracing::error!(target: "net", "REST: {e}"); } }
+        r = grpc_handle => { if let Err(e) = r { tracing::error!(target: "net", error = %e, "gRPC task failed"); } }
+        r = rest_handle => { if let Err(e) = r { tracing::error!(target: "net", error = %e, "REST task failed"); } }
     }
 }

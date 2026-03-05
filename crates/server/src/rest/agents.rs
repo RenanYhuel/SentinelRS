@@ -11,7 +11,7 @@ pub async fn list_agents(
 ) -> Result<Json<Vec<AgentSummary>>, StatusCode> {
     if let Some(ref pool) = state.pool {
         let rows = agent_queries::fetch_all(pool).await.map_err(|e| {
-            tracing::error!(error = %e, "failed to fetch agents from database");
+            tracing::error!(target: "rest", error = %e, "failed to fetch agents — check database connectivity");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
         let agents = rows
@@ -47,7 +47,7 @@ pub async fn get_agent(
         let row = agent_queries::fetch_one(pool, &agent_id)
             .await
             .map_err(|e| {
-                tracing::error!(error = %e, %agent_id, "failed to fetch agent from database");
+                tracing::error!(target: "rest", error = %e, %agent_id, "failed to fetch agent — check database connectivity");
                 StatusCode::INTERNAL_SERVER_ERROR
             })?
             .ok_or(StatusCode::NOT_FOUND)?;

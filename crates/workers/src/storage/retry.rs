@@ -41,7 +41,7 @@ pub async fn write_with_retry(
             Err(e) if attempt < max_retries && is_transient(&e) => {
                 attempt += 1;
                 let delay = std::time::Duration::from_millis(100 * 2u64.pow(attempt - 1));
-                tracing::warn!(attempt, error = %e, "transient DB error, retrying");
+                tracing::warn!(target: "retry", attempt, max_retries, error = %e, "Transient DB error, retrying");
                 tokio::time::sleep(delay).await;
             }
             Err(e) => return Err(e),

@@ -32,13 +32,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!(
         target: "system",
         worker_id = identity.id(),
+        pid = std::process::id(),
+        version = env!("CARGO_PKG_VERSION"),
         "Starting SentinelRS Worker"
     );
 
     spawn_signal_handler(cancel.clone());
 
     let sw = logging::stopwatch();
-    let pool = create_pool(&config.database_url, config.max_db_connections).await?;
+    let pool = match create_pool(&config.database_url, config.max_db_connections).await {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::error!(
+                target: "db",
+                error = %e,
+                "{}",
+                sentinel_common::logging::actionable::db_unreachable(&config.database_url, &e)
+            );
+            std::process::exit(1);
+        }
+    };
     tracing::info!(target: "db", "Database pool created{sw}");
 
     let applied = migrator::run_migrations(&pool).await?;
@@ -79,7 +92,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
 
     let sw = logging::stopwatch();
-    let (js, _client) = connect_jetstream(&config.nats_url).await?;
+    let (js, _client) = match connect_jetstream(&config.nats_url).await {
+        Ok(pair) => pair,
+        Err(e) => {
+            tracing::error!(
+                target: "net",
+                error = %e,
+                "{}",
+                sentinel_common::logging::actionable::nats_unreachable(&config.nats_url, &e)
+            );
+            std::process::exit(1);
+        }
+    };
     tracing::info!(target: "net", nats_url = %config.nats_url, "NATS JetStream connected{sw}");
 
     let stream_config = StreamConfig::default();

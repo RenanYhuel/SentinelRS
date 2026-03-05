@@ -61,19 +61,19 @@ impl ConsumerLoop {
                 match decode_batch(&msg) {
                     Ok(batch) => {
                         if let Err(e) = on_batch(batch, batch_id).await {
-                            tracing::error!(error = %e, "processing batch failed, nacking");
+                            tracing::error!(target: "work", error = %e, "Batch processing failed, nacking");
                             if let Err(ne) = msg.ack().await {
-                                tracing::error!(error = %ne, "nack failed");
+                                tracing::error!(target: "work", error = %ne, "Nack failed");
                             }
                             self.in_flight.fetch_sub(1, Ordering::Relaxed);
                             continue;
                         }
                         if let Err(e) = msg.ack().await {
-                            tracing::error!(error = %e, "ack failed");
+                            tracing::error!(target: "work", error = %e, "Ack failed");
                         }
                     }
                     Err(e) => {
-                        tracing::error!(error = %e, "decode failed, acking to discard");
+                        tracing::error!(target: "work", error = %e, "Decode failed, acking to discard");
                         let _ = msg.ack().await;
                     }
                 }

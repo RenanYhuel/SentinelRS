@@ -81,7 +81,13 @@ pub async fn handle_metrics_batch(
         .publish(&legacy_batch, signature_str, Some(key_id))
         .await
     {
-        tracing::error!(batch_id = %batch.batch_id, error = %e, "broker publish failed");
+        tracing::error!(
+            target: "data",
+            batch_id = %batch.batch_id,
+            error = %e,
+            "{}",
+            sentinel_common::logging::actionable::broker_publish_failed(&batch.batch_id, &e)
+        );
         metrics.inc_broker_publish_errors();
         return ack_message(
             &batch.batch_id,

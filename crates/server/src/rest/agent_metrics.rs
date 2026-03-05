@@ -100,7 +100,7 @@ pub async fn latest_metrics(
         .as_ref()
         .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
     let rows = repo.latest(&agent_id).await.map_err(|e| {
-        tracing::error!(error = %e, "latest_metrics query failed");
+        tracing::error!(target: "rest", error = %e, agent_id = %agent_id, "latest_metrics query failed");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     Ok(Json(serde_json::json!({
@@ -123,7 +123,7 @@ pub async fn metric_history(
         .history(&agent_id, &q.metric, from, to, &q.interval)
         .await
         .map_err(|e| {
-            tracing::error!(error = %e, "metric_history query failed");
+            tracing::error!(target: "rest", error = %e, agent_id = %agent_id, "metric_history query failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
     Ok(Json(serde_json::json!({
@@ -145,7 +145,7 @@ pub async fn metric_names(
         .as_ref()
         .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
     let names = repo.metric_names(&agent_id).await.map_err(|e| {
-        tracing::error!(error = %e, "metric_names query failed");
+        tracing::error!(target: "rest", error = %e, agent_id = %agent_id, "metric_names query failed");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     Ok(Json(serde_json::json!({
@@ -162,7 +162,7 @@ pub async fn fleet_summary(
         .as_ref()
         .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
     let rows = repo.summary().await.map_err(|e| {
-        tracing::error!(error = %e, "fleet_summary query failed");
+        tracing::error!(target: "rest", error = %e, "fleet_summary query failed");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     Ok(Json(serde_json::json!({ "agents": rows })))
@@ -184,7 +184,7 @@ pub async fn metric_aggregates(
         _ => repo.history_1h(&agent_id, &q.metric, from, to).await,
     }
     .map_err(|e| {
-        tracing::error!(error = %e, "metric_aggregates query failed");
+        tracing::error!(target: "rest", error = %e, agent_id = %agent_id, "metric_aggregates query failed");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -211,7 +211,7 @@ pub async fn compare_agents(
         .compare(&agent_ids, &q.metric, from, to, &q.interval)
         .await
         .map_err(|e| {
-            tracing::error!(error = %e, "compare_agents query failed");
+            tracing::error!(target: "rest", error = %e, "compare_agents query failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -239,7 +239,7 @@ pub async fn metric_percentiles(
         .percentiles(&agent_id, &q.metric, from, to)
         .await
         .map_err(|e| {
-            tracing::error!(error = %e, "metric_percentiles query failed");
+            tracing::error!(target: "rest", error = %e, agent_id = %agent_id, "metric_percentiles query failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -262,7 +262,7 @@ pub async fn top_metrics(
         .as_ref()
         .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
     let rows = repo.top(&agent_id, q.limit).await.map_err(|e| {
-        tracing::error!(error = %e, "top_metrics query failed");
+        tracing::error!(target: "rest", error = %e, agent_id = %agent_id, "top_metrics query failed");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     Ok(Json(serde_json::json!({
@@ -286,7 +286,7 @@ pub async fn export_metrics(
         .export_raw(&agent_id, from, to, q.metric.as_deref())
         .await
         .map_err(|e| {
-            tracing::error!(error = %e, "export_metrics query failed");
+            tracing::error!(target: "rest", error = %e, agent_id = %agent_id, "export_metrics query failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -334,7 +334,7 @@ pub async fn heatmap(
     let (from, to) = default_range(q.from, q.to);
 
     let summary = repo.summary().await.map_err(|e| {
-        tracing::error!(error = %e, "heatmap summary query failed");
+        tracing::error!(target: "rest", error = %e, "heatmap summary query failed");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -347,7 +347,7 @@ pub async fn heatmap(
         .compare(&agent_ids, &q.metric, from, to, &q.interval)
         .await
         .map_err(|e| {
-            tracing::error!(error = %e, "heatmap compare query failed");
+            tracing::error!(target: "rest", error = %e, "heatmap compare query failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 

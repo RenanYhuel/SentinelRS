@@ -12,6 +12,11 @@ pub enum Category {
     Work,
     Alert,
     Cfg,
+    Retry,
+    Notify,
+    Rest,
+    Backpressure,
+    Registry,
     Unknown,
 }
 
@@ -28,6 +33,11 @@ impl Category {
             Self::Work => "WORK",
             Self::Alert => "ALERT",
             Self::Cfg => "CFG",
+            Self::Retry => "RETRY",
+            Self::Notify => "NOTIFY",
+            Self::Rest => "REST",
+            Self::Backpressure => "BKPRES",
+            Self::Registry => "REGISTRY",
             Self::Unknown => "LOG",
         }
     }
@@ -44,6 +54,11 @@ impl Category {
             Self::Work => colors::BRIGHT_CYAN,
             Self::Alert => colors::BRIGHT_RED,
             Self::Cfg => colors::WHITE,
+            Self::Retry => colors::YELLOW,
+            Self::Notify => colors::BRIGHT_BLUE,
+            Self::Rest => colors::BRIGHT_GREEN,
+            Self::Backpressure => colors::RED,
+            Self::Registry => colors::MAGENTA,
             Self::Unknown => colors::GRAY,
         }
     }
@@ -81,6 +96,21 @@ impl Category {
         if t == "cfg" || t == "config" {
             return Self::Cfg;
         }
+        if t == "retry" {
+            return Self::Retry;
+        }
+        if t == "notify" || t == "notification" {
+            return Self::Notify;
+        }
+        if t == "rest" || t == "api" {
+            return Self::Rest;
+        }
+        if t == "backpressure" {
+            return Self::Backpressure;
+        }
+        if t == "registry" {
+            return Self::Registry;
+        }
 
         if t.contains("migration") || t.contains("database") {
             return Self::Db;
@@ -92,13 +122,11 @@ impl Category {
         if t.contains("auth") || t.contains("provisioning") || t.contains("token") {
             return Self::Auth;
         }
-        if t.contains("session")
-            || t.contains("watchdog")
-            || t.contains("presence")
-            || t.contains("registry")
-            || t.contains("heartbeat")
-        {
+        if t.contains("session") || t.contains("watchdog") || t.contains("presence") {
             return Self::Conn;
+        }
+        if t.contains("registry") || t.contains("heartbeat") {
+            return Self::Registry;
         }
         if t.contains("metric") || t.contains("ingest") || t.contains("consumer") {
             return Self::Data;
@@ -109,8 +137,20 @@ impl Category {
         if t.contains("worker") {
             return Self::Work;
         }
-        if t.contains("alert") || t.contains("notif") {
+        if t.contains("alert") {
             return Self::Alert;
+        }
+        if t.contains("notif") {
+            return Self::Notify;
+        }
+        if t.contains("retry") {
+            return Self::Retry;
+        }
+        if t.contains("backpressure") || t.contains("circuit") {
+            return Self::Backpressure;
+        }
+        if t.contains("rest") {
+            return Self::Rest;
         }
         if t.contains("config") {
             return Self::Cfg;

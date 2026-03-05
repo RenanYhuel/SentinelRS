@@ -11,7 +11,7 @@ pub async fn fleet_overview(
 ) -> Result<Json<FleetOverview>, StatusCode> {
     if let Some(ref pool) = state.pool {
         let rows = agent_queries::fetch_all(pool).await.map_err(|e| {
-            tracing::error!(error = %e, "failed to fetch agents for fleet overview");
+            tracing::error!(target: "rest", error = %e, "failed to fetch agents for fleet overview — check database connectivity");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
         let agents: Vec<_> = rows

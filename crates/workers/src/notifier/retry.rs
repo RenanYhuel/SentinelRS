@@ -54,7 +54,7 @@ impl<N: Notifier> RetryNotifier<N> {
                 )
                 .await
             {
-                tracing::error!(error = %dlq_err, "failed to write to DLQ");
+                tracing::error!(target: "notify", error = %dlq_err, "Failed to write to DLQ");
             }
         }
 
