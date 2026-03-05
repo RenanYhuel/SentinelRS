@@ -114,11 +114,7 @@ async fn check_docker() -> bool {
 async fn fetch_token(server_url: &str, secret: &str) -> Result<String> {
     let url = format!("{}/v1/auth/token", server_url.trim_end_matches('/'));
     let body = serde_json::json!({ "secret": secret });
-    let resp = reqwest::Client::new()
-        .post(&url)
-        .json(&body)
-        .send()
-        .await?;
+    let resp = reqwest::Client::new().post(&url).json(&body).send().await?;
     if !resp.status().is_success() {
         anyhow::bail!("invalid secret or server rejected request");
     }
