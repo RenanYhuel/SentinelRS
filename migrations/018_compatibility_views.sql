@@ -5,9 +5,9 @@ CREATE OR REPLACE VIEW v_agents AS
 SELECT
     agent_id AS id,
     agent_id,
-    name,
+    hw_id,
     status,
-    labels,
+    agent_version,
     last_seen,
-    created_at
+    to_timestamp(registered_at_ms / 1000.0) AS registered_at
 FROM agents;
