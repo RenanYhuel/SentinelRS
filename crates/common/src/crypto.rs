@@ -1,6 +1,7 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use hmac::{Hmac, Mac};
+use rand::Rng;
 use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -21,7 +22,9 @@ pub fn sign_data(secret: &[u8], data: &[u8]) -> String {
 }
 
 pub fn generate_secret() -> Vec<u8> {
-    uuid::Uuid::new_v4().as_bytes().to_vec()
+    let mut buf = [0u8; 32];
+    rand::thread_rng().fill(&mut buf);
+    buf.to_vec()
 }
 
 #[cfg(test)]
@@ -47,8 +50,8 @@ mod tests {
     }
 
     #[test]
-    fn generate_secret_is_16_bytes() {
-        assert_eq!(generate_secret().len(), 16);
+    fn generate_secret_is_32_bytes() {
+        assert_eq!(generate_secret().len(), 32);
     }
 
     #[test]

@@ -30,3 +30,10 @@ pub fn text_optional(prompt: &str) -> Result<Option<String>> {
         Ok(Some(val))
     }
 }
+
+pub fn password(prompt: &str) -> Result<String> {
+    let val = dialoguer::Password::with_theme(&ColorfulTheme::default())
+        .with_prompt(prompt)
+        .interact()?;
+    Ok(val)
+}

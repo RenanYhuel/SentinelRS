@@ -10,6 +10,7 @@ mod init;
 mod key;
 mod metrics;
 mod notifiers;
+mod plugins;
 mod register;
 mod rules;
 mod status;
@@ -49,8 +50,11 @@ pub enum Commands {
     #[command(subcommand, about = "Alert rule management")]
     Rules(rules::RulesCmd),
 
-    #[command(subcommand, about = "Notifier testing")]
+    #[command(subcommand, about = "Notifier management", visible_alias = "notify")]
     Notifiers(notifiers::NotifiersCmd),
+
+    #[command(subcommand, about = "WASM plugin management")]
+    Plugins(plugins::PluginsCmd),
 
     #[command(subcommand, about = "Encryption key management")]
     Key(key::KeyCmd),
@@ -89,6 +93,7 @@ pub async fn run(opts: crate::Opts) -> Result<()> {
         Commands::Config(cmd) => config::execute(cmd, mode).await,
         Commands::Rules(cmd) => rules::execute(cmd, mode, opts.server).await,
         Commands::Notifiers(cmd) => notifiers::execute(cmd, mode, opts.server).await,
+        Commands::Plugins(cmd) => plugins::execute(cmd, mode).await,
         Commands::Key(cmd) => {
             key::execute(cmd, mode, opts.config)?;
             Ok(())

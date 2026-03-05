@@ -28,8 +28,6 @@ Agent                              Server                         Workers
                                                                 TimescaleDB
 ```
 
-> Full architecture details: [docs/architecture.md](docs/architecture.md)
-
 ## Highlights
 
 - **Bidirectional gRPC streaming** — persistent connection with handshake, heartbeats and server-push commands
@@ -40,7 +38,7 @@ Agent                              Server                         Workers
 - **WASM plugin runtime** (wasmtime) — extend collection with sandboxed user code
 - **NATS JetStream** for decoupled, at-least-once delivery to workers
 - **TimescaleDB** with hypertables, continuous aggregates and automatic migrations
-- **Alerting engine** with configurable rules, severity levels and multi-channel notifications (webhook, Slack, Discord, SMTP)
+- **Alerting engine** with configurable rules, severity levels and 10 notification backends
 - **Admin CLI** — cluster monitoring, live metrics, provisioning, rule management and more
 
 ## Workspace
@@ -51,7 +49,7 @@ Agent                              Server                         Workers
 | `crates/agent`   | Agent binary — collectors, WAL, streaming client, bootstrap, WASM runtime |
 | `crates/server`  | Ingestion gateway — gRPC streaming + REST API, provisioning, presence     |
 | `crates/workers` | JetStream consumers, DB writers, aggregator, alert engine, notifiers      |
-| `crates/cli`     | Admin CLI — cluster, agents, provisioning, rules, WAL, keys               |
+| `crates/cli`     | Admin CLI — cluster, agents, provisioning, rules, WAL, keys, metrics      |
 
 ## Quick Start (Docker)
 
@@ -73,30 +71,31 @@ sentinel agents list
 sentinel cluster status
 ```
 
-> Full quickstart guide: [docs/quickstart.md](docs/quickstart.md)
-
 ### Building from source
 
 ```bash
-# Prerequisites: Rust stable, protoc, Docker
 cargo build --workspace --release
 ```
 
 ## Documentation
 
-| Document                               | Description                                          |
-| -------------------------------------- | ---------------------------------------------------- |
-| [Quick Start](docs/quickstart.md)      | 5-minute Docker-first setup guide                    |
-| [Docker](docs/docker.md)               | Images, compose, scaling, production                 |
-| [Architecture](docs/architecture.md)   | System design, data flow, crate responsibilities     |
-| [Streaming](docs/streaming.md)         | gRPC bidirectional protocol                          |
-| [Provisioning](docs/provisioning.md)   | Bootstrap tokens and zero-touch agent setup          |
-| [CLI Reference](docs/cli.md)           | All commands with usage examples                     |
-| [Configuration](docs/configuration.md) | Agent, server and worker settings                    |
-| [Deployment](docs/deployment.md)       | Docker strategy, production checklist, TLS setup     |
-| [Security](docs/security.md)           | HMAC signing, encryption, key rotation, WASM sandbox |
-| [Development](docs/development.md)     | Building from source, tests, CI pipeline             |
-| [Contributing](CONTRIBUTING.md)        | How to contribute                                    |
+| Document                                         | Description                                            |
+| ------------------------------------------------ | ------------------------------------------------------ |
+| [Quick Start](docs/quickstart.md)                | 5-minute Docker-first setup guide                      |
+| [Installation](docs/installation.md)             | All install methods, shell completions, Docker images  |
+| [Architecture](docs/architecture.md)             | System design, data flow, database schema              |
+| [Configuration](docs/configuration.md)           | Agent, server, worker and CLI settings                 |
+| [Deployment](docs/deployment.md)                 | Docker, binary, systemd, TLS, packaging, checklist     |
+| [Security](docs/security.md)                     | HMAC signing, mTLS, key rotation, WASM sandbox         |
+| [API Reference](docs/api-reference.md)           | All 37 REST endpoints with curl examples               |
+| [CLI Reference](docs/cli-reference.md)           | Every CLI command with flags and output samples        |
+| [Notifications](docs/notifications.md)           | 10 backends setup guide (Slack, Discord, PagerDuty...) |
+| [Streaming Protocol](docs/streaming.md)          | gRPC bidirectional protocol specification              |
+| [Scaling](docs/scaling.md)                       | Worker scaling, NATS tuning, capacity planning         |
+| [Plugin Development](docs/plugin-development.md) | WASM plugin SDK, host functions, manifest              |
+| [Troubleshooting](docs/troubleshooting.md)       | Common problems and solutions                          |
+| [Development](docs/development.md)               | Building from source, tests, CI pipeline               |
+| [Contributing](CONTRIBUTING.md)                  | How to contribute                                      |
 
 ## CI
 

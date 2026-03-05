@@ -8,9 +8,9 @@ use crate::output::OutputMode;
 
 #[derive(Subcommand)]
 pub enum AlertsCmd {
-    #[command(about = "List recent alerts")]
+    #[command(about = "List recent alerts", visible_alias = "ls")]
     List(list::ListArgs),
-    #[command(about = "Get details for a specific alert")]
+    #[command(about = "Get details for a specific alert", visible_alias = "show")]
     Get(get::GetArgs),
 }
 

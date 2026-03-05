@@ -1,8 +1,9 @@
-# gRPC Streaming Protocol (V2)
+# gRPC Streaming Protocol
 
-SentinelRS V2 replaces the V1 unary RPCs with a persistent bidirectional gRPC stream between each agent and the server.
+SentinelRS uses a bidirectional gRPC stream between agents and the server.
+This document specifies the V2 streaming protocol defined in `sentinel.proto`.
 
-## Service definition
+## Service Definition
 
 ```protobuf
 service SentinelStream {
@@ -10,11 +11,14 @@ service SentinelStream {
 }
 ```
 
-A single `OpenStream` call carries all agent-server communication: handshake, metrics, heartbeats, bootstrap, config updates and commands.
+A single persistent TCP connection carries all communication:
+handshake, metrics, heartbeats, bootstrap, config updates, and commands.
 
-## Message envelopes
+---
 
-### AgentMessage
+## Message Envelope
+
+### Agent → Server
 
 ```protobuf
 message AgentMessage {
@@ -27,7 +31,7 @@ message AgentMessage {
 }
 ```
 
-### ServerMessage
+### Server → Agent
 
 ```protobuf
 message ServerMessage {
@@ -43,31 +47,37 @@ message ServerMessage {
 }
 ```
 
-## Connection lifecycle
+---
+
+## Connection Lifecycle
 
 ```
-Agent                                    Server
-  │                                        │
-  │──── HandshakeRequest ────────────────▶ │  (agent_id, version, key_id, signature)
-  │                                        │  validate signature
-  │◀──── HandshakeAck ────────────────── │  (status, heartbeat_interval)
-  │                                        │
-  │──── MetricsBatch ───────────────────▶ │  (batch_id, metrics, signature)
-  │◀──── BatchAck ──────────────────────  │  (accepted / rejected / retry)
-  │                                        │
-  │──── HeartbeatPing ──────────────────▶ │  (timestamp, system_stats)
-  │◀──── HeartbeatPong ────────────────── │  (server_time, next_interval)
-  │                                        │
-  │◀──── ConfigUpdate ────────────────── │  (server-initiated push)
-  │◀──── Command ─────────────────────── │  (reload, restart_collector, update_interval)
-  │                                        │
-  │◀──── ServerError ─────────────────── │  (code, message, fatal)
-  │      if fatal → close stream           │
+Agent                              Server
+  │                                  │
+  │─── OpenStream ──────────────────→│
+  │                                  │
+  │─── HandshakeRequest ───────────→│   (agent_id, key_id, signature)
+  │←── HandshakeAck ───────────────│   (OK / REJECTED / UPGRADE_REQUIRED)
+  │                                  │
+  │─── MetricsBatch ───────────────→│   (signed, sequenced)
+  │←── BatchAck ───────────────────│   (ACCEPTED / REJECTED / RETRY)
+  │                                  │
+  │─── HeartbeatPing ──────────────→│   (system stats)
+  │←── HeartbeatPong ──────────────│   (next interval)
+  │                                  │
+  │←── ConfigUpdate ───────────────│   (server-initiated)
+  │←── Command ────────────────────│   (server-initiated)
+  │←── ServerError ────────────────│   (fatal = disconnect)
+  │                                  │
 ```
+
+---
 
 ## Handshake
 
-The first message on every stream must be a `HandshakeRequest`. The agent signs the request with its HMAC key to prove identity.
+The first message on every stream must be a `HandshakeRequest`.
+
+### Request
 
 ```protobuf
 message HandshakeRequest {
@@ -80,19 +90,46 @@ message HandshakeRequest {
 }
 ```
 
-The server responds with a `HandshakeAck`:
+| Field           | Description                                    |
+| --------------- | ---------------------------------------------- | ------------- |
+| `agent_id`      | Registered agent identifier                    |
+| `agent_version` | Agent binary version                           |
+| `capabilities`  | Supported features (`metrics`, `plugins`, etc) |
+| `key_id`        | HMAC key identifier                            |
+| `timestamp_ms`  | Current timestamp (replay protection)          |
+| `signature`     | HMAC-SHA256 of `agent_id                       | timestamp_ms` |
 
-| Status                       | Meaning                                   |
-| ---------------------------- | ----------------------------------------- |
-| `HANDSHAKE_OK`               | Authenticated, stream is live             |
-| `HANDSHAKE_REJECTED`         | Invalid credentials, stream will close    |
-| `HANDSHAKE_UPGRADE_REQUIRED` | Agent version too old, must upgrade first |
+### Response
 
-On `HANDSHAKE_OK`, the server also sends the `heartbeat_interval_ms` the agent should use.
+```protobuf
+message HandshakeAck {
+  HandshakeStatus status = 1;
+  string message = 2;
+  int64 server_time_ms = 3;
+  int64 heartbeat_interval_ms = 4;
+}
+```
 
-## Metrics streaming
+| Status                       | Action                            |
+| ---------------------------- | --------------------------------- |
+| `HANDSHAKE_OK`               | Stream authenticated, proceed     |
+| `HANDSHAKE_REJECTED`         | Invalid credentials, disconnect   |
+| `HANDSHAKE_UPGRADE_REQUIRED` | Agent version too old, disconnect |
 
-Agents send batches as `MetricsBatch` messages through the open stream. Each batch includes an HMAC signature over its content.
+### Signature Computation
+
+```
+signature = HMAC-SHA256(secret, agent_id + "|" + timestamp_ms)
+```
+
+The server verifies the signature using the key referenced by `key_id`.
+Timestamps outside the replay window (`REPLAY_WINDOW_MS`) are rejected.
+
+---
+
+## Metrics Batching
+
+### MetricsBatch
 
 ```protobuf
 message MetricsBatch {
@@ -106,24 +143,80 @@ message MetricsBatch {
 }
 ```
 
-The server acknowledges each batch with a `BatchAck`:
+| Field           | Description                             |
+| --------------- | --------------------------------------- |
+| `batch_id`      | Unique batch identifier (UUID)          |
+| `seq_start`     | First sequence number in batch          |
+| `seq_end`       | Last sequence number in batch           |
+| `created_at_ms` | Agent-side creation timestamp           |
+| `metrics`       | Array of metric samples                 |
+| `meta`          | Arbitrary metadata                      |
+| `signature`     | HMAC-SHA256 of serialized batch payload |
 
-| Status           | Agent action                      |
-| ---------------- | --------------------------------- |
-| `BATCH_ACCEPTED` | Remove from WAL                   |
-| `BATCH_REJECTED` | Log error, do not retry           |
-| `BATCH_RETRY`    | Keep in WAL, resend after backoff |
+### BatchAck
 
-## Heartbeats
+```protobuf
+message BatchAck {
+  string batch_id = 1;
+  BatchAckStatus status = 2;
+  string message = 3;
+}
+```
 
-The agent sends periodic `HeartbeatPing` messages containing a timestamp and live system stats.
+| Status           | Agent Action                    |
+| ---------------- | ------------------------------- |
+| `BATCH_ACCEPTED` | Remove batch from WAL           |
+| `BATCH_REJECTED` | Log error, do not retry         |
+| `BATCH_RETRY`    | Keep in WAL, retry with backoff |
+
+### Metric Format
+
+```protobuf
+message Metric {
+  string name = 1;
+  map<string, string> labels = 2;
+  MetricType rtype = 3;
+  oneof value {
+    double value_double = 4;
+    int64 value_int = 5;
+    Histogram histogram = 6;
+  }
+  int64 timestamp_ms = 7;
+}
+
+enum MetricType {
+  METRIC_TYPE_UNSPECIFIED = 0;
+  GAUGE = 1;
+  COUNTER = 2;
+  HISTOGRAM = 3;
+}
+
+message Histogram {
+  repeated double boundaries = 1;
+  repeated uint64 counts = 2;
+  uint64 count = 3;
+  double sum = 4;
+}
+```
+
+---
+
+## Heartbeat
+
+Agents send periodic heartbeats with live system statistics.
+
+### HeartbeatPing
 
 ```protobuf
 message HeartbeatPing {
   int64 timestamp_ms = 1;
   SystemStats system_stats = 2;
 }
+```
 
+### SystemStats
+
+```protobuf
 message SystemStats {
   double cpu_percent = 1;
   uint64 memory_used_bytes = 2;
@@ -138,15 +231,63 @@ message SystemStats {
 }
 ```
 
-The server uses heartbeats to track agent presence and detect disconnections. If no heartbeat arrives within the expected interval, the server's watchdog marks the agent as disconnected and fires a presence event.
+### HeartbeatPong
 
-The `HeartbeatPong` response can adjust the next heartbeat interval dynamically.
+```protobuf
+message HeartbeatPong {
+  int64 server_time_ms = 1;
+  int64 next_heartbeat_interval_ms = 2;
+}
+```
 
-## Server-initiated messages
+The server can adjust the heartbeat interval dynamically via `next_heartbeat_interval_ms`.
+
+---
+
+## Bootstrap (Zero-Touch Provisioning)
+
+New agents can self-register using a bootstrap token.
+
+### BootstrapRequest
+
+```protobuf
+message BootstrapRequest {
+  string bootstrap_token = 1;
+  string hw_id = 2;
+  string agent_version = 3;
+}
+```
+
+### BootstrapResponse
+
+```protobuf
+message BootstrapResponse {
+  BootstrapStatus status = 1;
+  string agent_id = 2;
+  string secret = 3;
+  string key_id = 4;
+  bytes config_yaml = 5;
+  string message = 6;
+}
+```
+
+| Status                    | Description                   |
+| ------------------------- | ----------------------------- |
+| `BOOTSTRAP_OK`            | Agent provisioned, save creds |
+| `BOOTSTRAP_INVALID_TOKEN` | Token not found               |
+| `BOOTSTRAP_EXPIRED_TOKEN` | Token has expired             |
+
+After receiving `BOOTSTRAP_OK`:
+
+1. Agent saves `agent_id`, `secret`, `key_id`
+2. Agent writes `config_yaml` to disk
+3. Agent disconnects and reconnects with a normal `HandshakeRequest`
+
+---
+
+## Server-Initiated Messages
 
 ### ConfigUpdate
-
-The server can push configuration changes to connected agents:
 
 ```protobuf
 message ConfigUpdate {
@@ -155,15 +296,26 @@ message ConfigUpdate {
 }
 ```
 
+Pushed when server-side config changes. Agent applies the new config and reloads.
+
 ### Command
 
-Remote commands sent by the server:
+```protobuf
+message Command {
+  string command_id = 1;
+  oneof action {
+    ReloadConfig reload_config = 2;
+    RestartCollector restart_collector = 3;
+    UpdateInterval update_interval = 4;
+  }
+}
+```
 
-| Command            | Effect                                |
-| ------------------ | ------------------------------------- |
-| `ReloadConfig`     | Agent reloads its config file         |
-| `RestartCollector` | Agent restarts metric collection      |
-| `UpdateInterval`   | Change collection interval on the fly |
+| Action              | Effect                              |
+| ------------------- | ----------------------------------- |
+| `reload_config`     | Agent reloads config from disk      |
+| `restart_collector` | Agent restarts the metric collector |
+| `update_interval`   | Agent changes collection interval   |
 
 ### ServerError
 
@@ -175,59 +327,35 @@ message ServerError {
 }
 ```
 
-When `fatal` is true, the agent closes the stream and initiates reconnection.
+When `fatal = true`, the agent must disconnect and reconnect with backoff.
 
-## Reconnection
+---
 
-The agent implements automatic reconnection with exponential backoff:
+## Reconnection Strategy
 
-1. Detect stream closure (server error, network failure, or timeout)
-2. Wait with exponential backoff (starting at 1s, capped at 60s)
-3. Re-establish the stream with a new `HandshakeRequest`
-4. Resume sending unacked WAL entries
+When the stream disconnects:
 
-During disconnection, the agent continues collecting metrics locally. The WAL ensures no data loss.
+1. Wait with exponential backoff: 1s, 2s, 4s, 8s ... max 60s
+2. Jitter ±25% to avoid thundering herd
+3. Re-open stream and send `HandshakeRequest`
+4. Resume sending unsent WAL batches from `seq_start`
+5. On repeated `HANDSHAKE_REJECTED`, stop reconnecting and log error
 
-## Server-side architecture
+---
 
-### Session registry
+## Wire Format
 
-The `SessionRegistry` tracks all active streaming sessions. It provides:
+- Transport: HTTP/2 (gRPC)
+- Serialization: Protocol Buffers v3
+- Default port: `50051`
+- TLS: Optional (recommended for production)
+- mTLS: Supported for mutual authentication
 
-- Connected agent count
-- Per-agent session lookup
-- Cluster-wide statistics (`ClusterStats`)
+---
 
-### Presence system
+## V1 Legacy API
 
-The `PresenceEventBus` emits events when agents connect or disconnect:
-
-```
-PresenceEvent {
-  agent_id: String,
-  event: Connected | Disconnected(reason),
-}
-```
-
-Disconnect reasons include: `Timeout`, `StreamClosed`, `HandshakeFailure`.
-
-These events are exposed via the REST API's SSE endpoint for real-time monitoring (`sentinel cluster watch`).
-
-### Watchdog
-
-The `spawn_watchdog` background task periodically checks session liveness. If an agent hasn't sent a heartbeat within the configured interval, the watchdog removes the session and emits a disconnect event.
-
-### Stream dispatcher
-
-Incoming `AgentMessage` frames are routed by the dispatcher to specialized handlers:
-
-- `authenticator` — validates handshake signatures
-- `metrics_handler` — processes `MetricsBatch`, publishes to NATS
-- `heartbeat_handler` — updates presence, records latency
-
-## V1 backward compatibility
-
-The V1 unary `AgentService` RPCs remain available for agents that have not yet upgraded:
+The V1 unary RPCs remain available for backward compatibility:
 
 ```protobuf
 service AgentService {
@@ -237,4 +365,9 @@ service AgentService {
 }
 ```
 
-V1 agents connect via unary calls and are not tracked in the session registry or presence system. Migration to V2 streaming is recommended.
+V1 clients work with the same server. V2 streaming is preferred for:
+
+- Lower latency (persistent connection)
+- Server-initiated messages (config, commands)
+- Richer heartbeat data (SystemStats)
+- Better reconnection semantics

@@ -1,8 +1,15 @@
 pub mod channel;
 pub mod discord;
+pub mod dispatcher;
 pub mod dlq;
+pub mod gotify;
+pub mod ntfy;
+pub mod opsgenie;
+pub mod pagerduty;
 pub mod retry;
 pub mod signer;
 pub mod slack;
 pub mod smtp;
+pub mod teams;
+pub mod telegram;
 pub mod webhook;

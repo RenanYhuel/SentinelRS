@@ -15,7 +15,8 @@ pub async fn handle_register(
 ) -> Result<Response<RegisterResponse>, Status> {
     let trace_id = generate_trace_id();
     let req = request.into_inner();
-    tracing::info!(%trace_id, hw_id = %req.hw_id, "register request");
+    let span = tracing::info_span!("register", %trace_id, hw_id = %req.hw_id);
+    tracing::debug!(parent: &span, "register request received");
 
     if req.hw_id.is_empty() {
         return Err(Status::invalid_argument("hw_id is required"));
@@ -55,6 +56,12 @@ pub async fn handle_register(
             tracing::error!(error = %e, %agent_id, "failed to persist agent to database");
         }
     }
+
+    tracing::info!(
+        parent: &span,
+        %agent_id,
+        "agent registered"
+    );
 
     Ok(Response::new(RegisterResponse {
         agent_id,

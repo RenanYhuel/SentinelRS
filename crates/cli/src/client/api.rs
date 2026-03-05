@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::StatusCode;
 
 pub struct ApiClient {
@@ -11,6 +12,21 @@ impl ApiClient {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             http: reqwest::Client::new(),
+        }
+    }
+
+    pub fn with_token(base_url: &str, token: &str) -> Self {
+        let mut headers = HeaderMap::new();
+        if let Ok(val) = HeaderValue::from_str(&format!("Bearer {token}")) {
+            headers.insert(AUTHORIZATION, val);
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap_or_default();
+        Self {
+            base_url: base_url.trim_end_matches('/').to_string(),
+            http,
         }
     }
 
@@ -72,6 +88,18 @@ impl ApiClient {
             .await
             .context("request failed")?;
         Ok(resp.status())
+    }
+
+    pub async fn post_empty(&self, path: &str) -> Result<serde_json::Value> {
+        let resp = self
+            .http
+            .post(self.url(path))
+            .send()
+            .await
+            .context("request failed")?
+            .error_for_status()
+            .context("server returned error")?;
+        resp.json().await.context("invalid JSON response")
     }
 
     pub async fn get_text(&self, path: &str) -> Result<String> {

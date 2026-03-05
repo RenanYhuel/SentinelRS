@@ -91,6 +91,7 @@ async fn full_pipeline_verify_dedup_transform_alert() {
         for_duration_ms: 0,
         severity: Severity::Critical,
         annotations: HashMap::new(),
+        notifier_ids: Vec::new(),
     };
 
     let evaluator = Evaluator::new(vec![rule]);
@@ -152,6 +153,7 @@ async fn pipeline_alert_respects_for_duration() {
         for_duration_ms: 60_000,
         severity: Severity::Warning,
         annotations: HashMap::new(),
+        notifier_ids: Vec::new(),
     };
 
     let metrics = vec![cpu_metric(0, 90.0)];
@@ -182,6 +184,7 @@ async fn pipeline_no_alert_below_threshold() {
         for_duration_ms: 0,
         severity: Severity::Info,
         annotations: HashMap::new(),
+        notifier_ids: Vec::new(),
     };
 
     let metrics = vec![cpu_metric(0, 50.0)];

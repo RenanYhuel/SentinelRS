@@ -46,8 +46,13 @@ impl IngestPipeline {
 
         let db_start = Instant::now();
         let inserted = write_with_retry(&self.writer, &rows, MAX_RETRIES).await?;
+        let db_latency_ms = db_start.elapsed().as_millis() as u64;
         self.metrics.record_db_latency(db_start);
         self.metrics.add_rows_inserted(inserted);
+
+        if db_latency_ms > 500 {
+            sentinel_common::logging::latency::warn_slow("db_write", db_latency_ms, 500);
+        }
 
         self.agent_repo.touch_last_seen(&batch.agent_id).await?;
 
@@ -58,10 +63,13 @@ impl IngestPipeline {
         self.metrics.inc_batches_processed();
         self.metrics.record_processing_latency(start);
 
-        tracing::info!(
+        let latency_ms = start.elapsed().as_millis() as u64;
+        tracing::debug!(
+            target: "data",
             agent_id = %batch.agent_id,
             inserted,
-            "batch ingested"
+            latency_ms,
+            "Batch ingested"
         );
 
         Ok(())

@@ -7,29 +7,26 @@ on:
 permissions:
     contents: write
     packages: write
+    id-token: write
+    attestations: write
 
 env:
     CARGO_TERM_COLOR: always
+    SCCACHE_GHA_ENABLED: "true"
+    RUSTC_WRAPPER: "sccache"
 
 jobs:
-    build-linux-musl:
-        name: Linux (musl static)
+    build-linux-amd64:
+        name: Linux amd64 (musl static)
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@stable
               with:
                   targets: x86_64-unknown-linux-musl
+            - uses: mozilla-actions/sccache-action@v0.0.7
             - name: Install musl-tools
               run: sudo apt-get update && sudo apt-get install -y musl-tools
-            - uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                      target
-                  key: release-linux-musl-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: release-linux-musl-
             - run: cargo build --release --target x86_64-unknown-linux-musl
             - name: Package
               run: |
@@ -37,28 +34,50 @@ jobs:
                   for bin in sentinel_agent sentinel_server sentinel_workers sentinel_cli; do
                     cp target/x86_64-unknown-linux-musl/release/$bin dist/
                   done
-                  cd dist && tar czf ../sentinel-linux-x86_64-musl.tar.gz *
+                  cd dist && tar czf ../sentinel-linux-amd64.tar.gz *
             - uses: actions/upload-artifact@v4
               with:
-                  name: linux-musl
-                  path: sentinel-linux-x86_64-musl.tar.gz
+                  name: linux-amd64
+                  path: sentinel-linux-amd64.tar.gz
+
+    build-linux-arm64:
+        name: Linux arm64 (musl static)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: aarch64-unknown-linux-musl
+            - uses: mozilla-actions/sccache-action@v0.0.7
+            - name: Install cross-compilation tools
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y gcc-aarch64-linux-gnu musl-tools
+            - name: Build
+              env:
+                  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
+              run: cargo build --release --target aarch64-unknown-linux-musl
+            - name: Package
+              run: |
+                  mkdir -p dist
+                  for bin in sentinel_agent sentinel_server sentinel_workers sentinel_cli; do
+                    cp target/aarch64-unknown-linux-musl/release/$bin dist/
+                  done
+                  cd dist && tar czf ../sentinel-linux-arm64.tar.gz *
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: linux-arm64
+                  path: sentinel-linux-arm64.tar.gz
 
     build-windows:
-        name: Windows (MSVC)
+        name: Windows amd64 (MSVC)
         runs-on: windows-latest
         steps:
             - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@stable
               with:
                   targets: x86_64-pc-windows-msvc
-            - uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                      target
-                  key: release-windows-msvc-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: release-windows-msvc-
+            - uses: mozilla-actions/sccache-action@v0.0.7
             - run: cargo build --release --target x86_64-pc-windows-msvc
             - name: Package
               shell: pwsh
@@ -68,11 +87,11 @@ jobs:
                   foreach ($b in $bins) {
                     Copy-Item "target/x86_64-pc-windows-msvc/release/$b.exe" "dist/"
                   }
-                  Compress-Archive -Path dist/* -DestinationPath sentinel-windows-x86_64-msvc.zip
+                  Compress-Archive -Path dist/* -DestinationPath sentinel-windows-amd64.zip
             - uses: actions/upload-artifact@v4
               with:
-                  name: windows-msvc
-                  path: sentinel-windows-x86_64-msvc.zip
+                  name: windows-amd64
+                  path: sentinel-windows-amd64.zip
 
     build-macos:
         name: macOS (universal)
@@ -82,14 +101,7 @@ jobs:
             - uses: dtolnay/rust-toolchain@stable
               with:
                   targets: x86_64-apple-darwin,aarch64-apple-darwin
-            - uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                      target
-                  key: release-macos-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: release-macos-
+            - uses: mozilla-actions/sccache-action@v0.0.7
             - name: Build x86_64
               run: cargo build --release --target x86_64-apple-darwin
             - name: Build aarch64
@@ -112,45 +124,53 @@ jobs:
     publish-release:
         name: Publish GitHub Release
         runs-on: ubuntu-latest
-        needs: [build-linux-musl, build-windows, build-macos]
+        needs:
+            [build-linux-amd64, build-linux-arm64, build-windows, build-macos]
+        outputs:
+            tag: ${{ steps.version.outputs.tag }}
         steps:
             - uses: actions/checkout@v4
             - uses: actions/download-artifact@v4
               with:
                   path: artifacts
-            - name: Generate checksums
+            - name: Extract version
+              id: version
+              run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            - name: Flatten artifacts
               run: |
-                  cd artifacts
-                  find . -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec sha256sum {} \; | sort > ../SHA256SUMS.txt
+                  mkdir -p release
+                  find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
+            - name: Generate checksums
+              working-directory: release
+              run: sha256sum * > SHA256SUMS.txt
             - name: Sign checksums (GPG)
               if: env.GPG_PRIVATE_KEY != ''
               env:
                   GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
                   GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+              working-directory: release
               run: |
                   echo "$GPG_PRIVATE_KEY" | gpg --batch --import
                   gpg --batch --yes --pinentry-mode loopback \
                     --passphrase "$GPG_PASSPHRASE" \
                     --detach-sign --armor SHA256SUMS.txt
+            - name: Generate SBOM
+              uses: anchore/sbom-action@v0
+              with:
+                  path: .
+                  output-file: release/sbom-spdx.json
+                  format: spdx-json
             - name: Create release
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   TAG="${GITHUB_REF#refs/tags/}"
-                  ASSETS=""
-                  for f in artifacts/**/*.tar.gz artifacts/**/*.zip; do
-                    ASSETS="$ASSETS $f"
-                  done
-                  ASSETS="$ASSETS SHA256SUMS.txt"
-                  if [ -f SHA256SUMS.txt.asc ]; then
-                    ASSETS="$ASSETS SHA256SUMS.txt.asc"
-                  fi
-                  gh release create "$TAG" $ASSETS \
+                  gh release create "$TAG" release/* \
                     --title "$TAG" \
                     --generate-notes
 
     publish-docker:
-        name: Publish Docker Images
+        name: Publish Docker (${{ matrix.image }})
         runs-on: ubuntu-latest
         needs: [publish-release]
         strategy:
@@ -166,6 +186,8 @@ jobs:
                       dockerfile: docker/Dockerfile.cli
         steps:
             - uses: actions/checkout@v4
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@v3
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
             - name: Log in to GHCR
@@ -174,17 +196,77 @@ jobs:
                   registry: ghcr.io
                   username: ${{ github.actor }}
                   password: ${{ secrets.GITHUB_TOKEN }}
-            - name: Extract version
-              id: version
-              run: echo "tag=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-            - name: Build and push
+            - name: Extract metadata
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: ghcr.io/${{ github.repository_owner }}/sentinelrs-${{ matrix.image }}
+                  tags: |
+                      type=semver,pattern={{version}}
+                      type=semver,pattern={{major}}.{{minor}}
+                      type=semver,pattern={{major}}
+                      type=raw,value=latest,enable={{is_default_branch}}
+            - name: Build and push (multi-arch)
               uses: docker/build-push-action@v5
               with:
                   context: .
                   file: ${{ matrix.dockerfile }}
+                  platforms: linux/amd64,linux/arm64
                   push: true
-                  tags: |
-                      ghcr.io/${{ github.repository_owner }}/sentinelrs-${{ matrix.image }}:${{ steps.version.outputs.tag }}
-                      ghcr.io/${{ github.repository_owner }}/sentinelrs-${{ matrix.image }}:latest
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
+                  provenance: true
+                  sbom: true
+
+    sign-images:
+        name: Sign Docker Images
+        runs-on: ubuntu-latest
+        needs: [publish-docker]
+        if: github.event_name == 'push'
+        steps:
+            - uses: sigstore/cosign-installer@v3
+            - name: Log in to GHCR
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+            - name: Sign images
+              env:
+                  COSIGN_EXPERIMENTAL: "1"
+              run: |
+                  TAG="${GITHUB_REF#refs/tags/v}"
+                  for image in server worker agent cli; do
+                    IMAGE="ghcr.io/${{ github.repository_owner }}/sentinelrs-${image}:${TAG}"
+                    DIGEST=$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest}}' | jq -r '.digest')
+                    cosign sign --yes "ghcr.io/${{ github.repository_owner }}/sentinelrs-${image}@${DIGEST}"
+                  done
+
+    update-homebrew:
+        name: Update Homebrew Formula
+        runs-on: ubuntu-latest
+        needs: [publish-release]
+        if: "!contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha')"
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/download-artifact@v4
+              with:
+                  name: macos-universal
+            - name: Compute SHA256
+              id: sha
+              run: echo "sha256=$(sha256sum sentinel-macos-universal.tar.gz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+            - name: Update formula
+              env:
+                  GH_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
+              run: |
+                  TAG="${GITHUB_REF#refs/tags/}"
+                  VERSION="${TAG#v}"
+                  if [ -n "$GH_TOKEN" ]; then
+                    gh api repos/${{ github.repository_owner }}/homebrew-tap/dispatches \
+                      -f event_type=update-formula \
+                      -f "client_payload[version]=$VERSION" \
+                      -f "client_payload[sha256]=${{ steps.sha.outputs.sha256 }}" \
+                      -f "client_payload[url]=https://github.com/${{ github.repository }}/releases/download/${TAG}/sentinel-macos-universal.tar.gz"
+                  fi

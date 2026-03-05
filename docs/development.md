@@ -2,189 +2,225 @@
 
 ## Prerequisites
 
-| Tool             | Version         | Purpose                   |
-| ---------------- | --------------- | ------------------------- |
-| Rust             | Stable (latest) | Build toolchain           |
-| `protoc`         | 3.x+            | Protocol Buffers compiler |
-| Docker + Compose | Any recent      | Local NATS + TimescaleDB  |
+| Tool           | Version | Purpose                     |
+| -------------- | ------- | --------------------------- |
+| Rust           | stable  | `rustup default stable`     |
+| protoc         | 3.x+    | Protobuf compiler           |
+| Docker         | 20.x+   | Local stack for integration |
+| Docker Compose | v2+     | Multi-service orchestration |
 
-### Install protoc
+## Project Structure
 
-```bash
-# Ubuntu/Debian
-sudo apt-get install -y protobuf-compiler
-
-# macOS
-brew install protobuf
-
-# Windows
-choco install protoc
+```
+SentinelRS/
+├── Cargo.toml                  # Workspace definition
+├── crates/
+│   ├── common/                 # Shared library (proto, crypto, retry)
+│   │   ├── proto/sentinel.proto
+│   │   └── src/
+│   ├── agent/                  # Metrics collector agent
+│   │   └── src/
+│   │       ├── collector/      # System metrics (sysinfo)
+│   │       ├── plugin/         # WASM runtime (wasmtime)
+│   │       ├── buffer/         # Write-Ahead Log
+│   │       ├── security/       # HMAC, key store
+│   │       ├── scheduler/      # Collection timer
+│   │       ├── exporter/       # Batch builder + gRPC sender
+│   │       └── config/         # YAML config
+│   ├── server/                 # gRPC + REST server
+│   │   └── src/
+│   │       ├── stream/         # gRPC stream, sessions, registry
+│   │       ├── rest/           # REST API handlers
+│   │       └── auth/           # JWT + HMAC verification
+│   ├── workers/                # Background processors
+│   │   └── src/
+│   │       └── notifier/       # 10 notification backends
+│   └── cli/                    # Command-line tool
+│       └── src/
+│           ├── cmd/            # Subcommand implementations
+│           ├── client/         # HTTP client
+│           └── output/         # Tables, charts, themes
+├── migrations/                 # SQL migration files
+├── deploy/                     # Docker Compose + scripts
+├── packaging/                  # deb, macOS, MSI packaging
+├── scripts/                    # Dev utilities
+├── tests/                      # E2E tests
+└── docs/                       # Documentation
 ```
 
-## Building
+## Build
 
 ```bash
-# Debug build (all crates)
-cargo build --workspace
+# Debug build (fast compilation)
+cargo build
 
-# Release build
-cargo build --workspace --release
+# Release build (optimized)
+cargo build --release
 
 # Single crate
-cargo build -p sentinel_cli --release
+cargo build -p sentinel_server
+cargo build -p sentinel_cli
 ```
 
-Binaries are output to `target/release/`:
+## Protobuf
 
-- `sentinel_server`
-- `sentinel_workers`
-- `sentinel_agent`
-- `sentinel_cli`
-
-## Protobuf Generation
-
-Protobuf types are generated at build time by `sentinel_common`'s `build.rs`:
-
-```bash
-cargo build -p sentinel_common
-```
-
-Source: `crates/common/proto/sentinel.proto`
-
-The generated code is used by all crates via `sentinel_common::proto`.
+Protobuf definitions live in `crates/common/proto/sentinel.proto`. Code generation is handled automatically by `build.rs` via `prost-build` — no manual step needed. Generated code is placed in `target/` and included via `tonic::include_proto!`.
 
 ## Testing
 
 ### Unit Tests
 
 ```bash
-cargo test --workspace
+# All crates
+cargo test --workspace --lib
+
+# Single crate
+cargo test -p sentinel_server --lib
+cargo test -p sentinel_agent --lib
 ```
 
 ### Integration Tests
 
-Integration tests require NATS and TimescaleDB running locally:
+Integration tests require running NATS and TimescaleDB:
 
 ```bash
-docker compose -f deploy/docker-compose.yml up -d
-cargo test --workspace -- --test-threads=1
+docker compose -f deploy/docker-compose.yml up -d timescaledb nats
+cargo test --workspace
 ```
 
-`--test-threads=1` is required because integration tests share the database.
+### E2E Tests
 
-### Test Structure
+```bash
+cd tests/e2e
+./run_e2e.sh
+```
 
-| Location                | Coverage                                                |
-| ----------------------- | ------------------------------------------------------- |
-| `crates/agent/tests/`   | Plugin integration, agent integration                   |
-| `crates/server/tests/`  | gRPC integration, REST integration, security acceptance |
-| `crates/workers/tests/` | Storage integration, alert harness, aggregator          |
-| `crates/cli/src/tests/` | CLI subcommand unit tests                               |
+Uses `docker-compose.e2e.yml` to spin up the full stack and run scenario scripts.
+
+### Test Locations
+
+| Crate   | Unit Tests          | Integration Tests      |
+| ------- | ------------------- | ---------------------- |
+| common  | `src/*.rs` (inline) | —                      |
+| agent   | `src/*.rs` (inline) | `tests/integration.rs` |
+| server  | `src/*.rs` (inline) | `tests/`               |
+| workers | `src/*.rs` (inline) | `tests/`               |
+| cli     | `src/tests/`        | —                      |
 
 ## Linting
 
 ```bash
-# Clippy (treat warnings as errors)
-cargo clippy --workspace --all-targets -- -D warnings
+# Clippy (must be zero warnings)
+cargo clippy --workspace --all-targets
 
-# Formatting check
-cargo fmt --all -- --check
+# Format check
+cargo fmt --all --check
 
-# Auto-format
+# Format fix
 cargo fmt --all
 ```
 
+CI enforces `clippy -- -D warnings` (warnings are errors).
+
 ## Makefile
 
-Common tasks are available via `make`:
-
 ```bash
-make build-all    # cargo build --workspace
-make fmt          # cargo fmt --all
-make proto        # cargo build -p sentinel_common
-make compose-up   # docker-compose up -d
-make compose-down # docker-compose down
+make test          # cargo test --workspace
+make lint          # cargo clippy --workspace -- -D warnings
+make fmt           # cargo fmt --all --check
+make build         # cargo build --release
+make e2e           # docker compose E2E tests
+make docker-build  # Build all Docker images
 ```
 
-## CI Pipeline
+## Key Dependencies
 
-The GitHub Actions pipeline (`.github/workflows/ci.yml`) runs on every push and PR:
+| Crate       | Purpose                             |
+| ----------- | ----------------------------------- |
+| tokio       | Async runtime                       |
+| tonic       | gRPC framework                      |
+| prost       | Protobuf serialization              |
+| axum        | REST API framework                  |
+| async-nats  | NATS JetStream client               |
+| sqlx        | PostgreSQL async driver             |
+| wasmtime    | WASM plugin runtime                 |
+| sysinfo     | System metrics collection           |
+| dashmap     | Concurrent hash map (session store) |
+| clap        | CLI argument parsing                |
+| aes-gcm     | Key encryption at rest              |
+| hmac + sha2 | Batch signing                       |
+| lettre      | SMTP email sending                  |
+| reqwest     | HTTP client (webhooks, notifiers)   |
+| comfy-table | Table rendering                     |
+| colored     | Terminal colors                     |
+| dialoguer   | Interactive prompts                 |
+| indicatif   | Spinners and progress bars          |
+
+## Adding a New CLI Command
+
+1. Create `crates/cli/src/cmd/<group>/<command>.rs`
+2. Add the subcommand variant to the group's `enum` in `mod.rs`
+3. Wire `execute()` match arm in `mod.rs`
+4. Add `#[command(about = "...", visible_alias = "...")]` for help and aliases
+
+Example structure:
+
+```rust
+// crates/cli/src/cmd/agents/health.rs
+use anyhow::Result;
+use clap::Args;
+
+#[derive(Args)]
+pub struct HealthArgs {
+    pub id: Option<String>,
+}
+
+pub async fn run(args: HealthArgs, mode: OutputMode, server: Option<String>) -> Result<()> {
+    let api = client::build_client(server.as_deref())?;
+    let data = api.get_json(&format!("/v1/agents/{}/health", args.id.unwrap())).await?;
+    // render...
+    Ok(())
+}
+```
+
+## Adding a New REST Endpoint
+
+1. Create handler in `crates/server/src/rest/<handler>.rs`
+2. Add `mod <handler>;` to `rest/mod.rs`
+3. Add `.route(...)` to `rest/router.rs`
+
+Handler pattern:
+
+```rust
+use axum::{extract::State, Json};
+use crate::rest::AppState;
+
+pub async fn my_handler(State(state): State<AppState>) -> Json<serde_json::Value> {
+    // use state.pool, state.registry, etc.
+    Json(serde_json::json!({"ok": true}))
+}
+```
+
+## Adding a New WASM Host Function
+
+1. Define the function signature in `crates/agent/src/plugin/`
+2. Register it with the Wasmtime linker
+3. Document in [Plugin Development](plugin-development.md)
+
+## CI Pipeline
 
 ```
 fmt → clippy → test → build → integration-smoke
 ```
 
-### Stages
+All checks must pass before merge. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full workflow.
 
-| Stage                 | Description                                                                        |
-| --------------------- | ---------------------------------------------------------------------------------- |
-| **fmt**               | `cargo fmt --all -- --check`                                                       |
-| **clippy**            | `cargo clippy --workspace --all-targets -- -D warnings`                            |
-| **test**              | `cargo test --workspace`                                                           |
-| **build**             | Release builds for Linux (x86_64), Windows (x86_64), macOS (aarch64)               |
-| **integration-smoke** | Starts NATS + TimescaleDB services, runs integration tests with `--test-threads=1` |
-
-Build artifacts are packaged as zip files per target and uploaded for each run.
-
-## Project Structure
+## Commit Convention
 
 ```
-crates/
-├── common/          Shared library (protobuf, crypto, NATS config)
-│   ├── proto/       Protobuf definitions
-│   └── src/
-├── agent/           Agent binary
-│   └── src/
-│       ├── api/         Local HTTP API (health, ready, metrics)
-│       ├── buffer/      WAL (segments, compaction, CRC)
-│       ├── collector/   System metrics (sysinfo)
-│       ├── config/      YAML config loading
-│       ├── exporter/    gRPC + HTTP fallback exporters
-│       ├── plugin/      WASM runtime (wasmtime)
-│       ├── scheduler/   Collection scheduling
-│       ├── security/    Key store, HMAC signer, compression
-│       ├── cli.rs       CLI argument parsing
-│       ├── run.rs       Async orchestration
-│       └── shutdown.rs  Graceful shutdown
-├── server/          Ingestion gateway
-│   └── src/
-│       ├── auth/        JWT token creation/validation
-│       ├── broker/      NATS JetStream publisher
-│       ├── grpc/        gRPC service implementation
-│       ├── metrics/     Prometheus metrics
-│       ├── middleware/   Rate limiting, replay detection
-│       ├── rest/        Axum REST API (agents, rules, notifiers, health)
-│       └── store/       In-memory stores (agents, idempotency, rules)
-├── workers/         Background processors
-│   └── src/
-│       ├── aggregator/  Rolling time-series (avg, min, max)
-│       ├── alert/       Rule engine, FSM state, fingerprinting
-│       ├── api/         Health/metrics HTTP endpoint
-│       ├── consumer/    NATS JetStream pull consumer
-│       ├── dedup/       Batch deduplication
-│       └── metrics/     Worker-level Prometheus metrics
-└── cli/             Admin CLI
-    └── src/
-        ├── cmd/         Subcommands (register, wal, rules, etc.)
-        ├── output/      Human/JSON output formatting
-        └── tests/       CLI unit tests
+feat(cli): add agents health command
+fix(server): handle missing session in health endpoint
+docs: rewrite quickstart guide
+refactor(agent): extract collector module
+test(workers): add notification retry tests
 ```
-
-## Key Dependencies
-
-| Dependency      | Version     | Used For                     |
-| --------------- | ----------- | ---------------------------- |
-| `tokio`         | 1           | Async runtime                |
-| `tonic`         | 0.12        | gRPC framework               |
-| `prost`         | 0.13        | Protobuf serialization       |
-| `axum`          | 0.7         | REST API framework           |
-| `async-nats`    | 0.38        | NATS JetStream client        |
-| `sqlx`          | 0.8         | PostgreSQL driver (workers)  |
-| `wasmtime`      | 29          | WASM plugin runtime (agent)  |
-| `sysinfo`       | 0.35        | System metrics collection    |
-| `dashmap`       | 6           | Concurrent hash maps         |
-| `clap`          | 4           | CLI argument parsing         |
-| `aes-gcm`       | 0.10        | Key encryption               |
-| `hmac` + `sha2` | 0.12 / 0.10 | HMAC-SHA256 signing          |
-| `lettre`        | 0.11        | SMTP notifications (workers) |
-| `reqwest`       | 0.12        | HTTP client (webhooks, CLI)  |

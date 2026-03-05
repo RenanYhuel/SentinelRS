@@ -11,15 +11,15 @@ use crate::output::OutputMode;
 
 #[derive(Subcommand)]
 pub enum RulesCmd {
-    #[command(about = "List all alert rules")]
+    #[command(about = "List all alert rules", visible_alias = "ls")]
     List,
-    #[command(about = "Get details for a specific rule")]
+    #[command(about = "Get details for a specific rule", visible_alias = "show")]
     Get(get::GetArgs),
-    #[command(about = "Create a new alert rule")]
+    #[command(about = "Create a new alert rule", visible_alias = "add")]
     Create(create::CreateArgs),
     #[command(about = "Update an existing alert rule")]
     Update(update::UpdateArgs),
-    #[command(about = "Delete an alert rule")]
+    #[command(about = "Delete an alert rule", visible_alias = "rm")]
     Delete(delete::DeleteArgs),
 }
 

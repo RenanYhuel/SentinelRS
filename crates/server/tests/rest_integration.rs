@@ -2,18 +2,30 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
 
+use sentinel_server::auth::create_token;
 use sentinel_server::metrics::server_metrics::ServerMetrics;
 use sentinel_server::provisioning::TokenStore;
 use sentinel_server::rest::{router, AppState};
 use sentinel_server::store::{AgentRecord, AgentStore, RuleStore};
 use sentinel_server::stream::{PresenceEventBus, SessionRegistry};
 
+const TEST_SECRET: &[u8] = b"test-secret";
+
+fn test_bearer() -> String {
+    let far_future = i64::MAX / 2;
+    let token = create_token(TEST_SECRET, "test-admin", far_future);
+    format!("Bearer {token}")
+}
+
 fn app_state() -> AppState {
     AppState {
         agents: AgentStore::new(),
         rules: RuleStore::new(),
         rule_repo: None,
-        jwt_secret: b"test-secret".to_vec(),
+        notifier_repo: None,
+        history_repo: None,
+        metrics_repo: None,
+        jwt_secret: TEST_SECRET.to_vec(),
         metrics: ServerMetrics::new(),
         pool: None,
         token_store: Some(TokenStore::new()),
@@ -76,6 +88,7 @@ async fn list_agents_empty() {
         .oneshot(
             Request::builder()
                 .uri("/v1/agents")
+                .header("authorization", test_bearer())
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -100,6 +113,7 @@ async fn list_agents_with_seeded_data() {
         .oneshot(
             Request::builder()
                 .uri("/v1/agents")
+                .header("authorization", test_bearer())
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -125,6 +139,7 @@ async fn get_agent_found() {
         .oneshot(
             Request::builder()
                 .uri("/v1/agents/agent-1")
+                .header("authorization", test_bearer())
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -145,6 +160,7 @@ async fn get_agent_not_found() {
         .oneshot(
             Request::builder()
                 .uri("/v1/agents/nonexistent")
+                .header("authorization", test_bearer())
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -173,6 +189,7 @@ async fn create_rule_and_list() {
                 .method("POST")
                 .uri("/v1/rules")
                 .header("content-type", "application/json")
+                .header("authorization", test_bearer())
                 .body(Body::from(serde_json::to_vec(&body).unwrap()))
                 .unwrap(),
         )
@@ -186,6 +203,7 @@ async fn create_rule_and_list() {
         .oneshot(
             Request::builder()
                 .uri("/v1/rules")
+                .header("authorization", test_bearer())
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -216,6 +234,7 @@ async fn create_rule_invalid_condition() {
                 .method("POST")
                 .uri("/v1/rules")
                 .header("content-type", "application/json")
+                .header("authorization", test_bearer())
                 .body(Body::from(serde_json::to_vec(&body).unwrap()))
                 .unwrap(),
         )
@@ -232,6 +251,7 @@ async fn delete_rule_not_found() {
             Request::builder()
                 .method("DELETE")
                 .uri("/v1/rules/nonexistent")
+                .header("authorization", test_bearer())
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -254,6 +274,7 @@ async fn test_notifier_webhook_valid() {
                 .method("POST")
                 .uri("/v1/notifiers/test")
                 .header("content-type", "application/json")
+                .header("authorization", test_bearer())
                 .body(Body::from(serde_json::to_vec(&body).unwrap()))
                 .unwrap(),
         )
@@ -281,6 +302,7 @@ async fn test_notifier_unknown_type() {
                 .method("POST")
                 .uri("/v1/notifiers/test")
                 .header("content-type", "application/json")
+                .header("authorization", test_bearer())
                 .body(Body::from(serde_json::to_vec(&body).unwrap()))
                 .unwrap(),
         )
@@ -312,6 +334,7 @@ async fn update_rule() {
                 .method("POST")
                 .uri("/v1/rules")
                 .header("content-type", "application/json")
+                .header("authorization", test_bearer())
                 .body(Body::from(serde_json::to_vec(&create_body).unwrap()))
                 .unwrap(),
         )
@@ -335,6 +358,7 @@ async fn update_rule() {
                 .method("PUT")
                 .uri(format!("/v1/rules/{rule_id}"))
                 .header("content-type", "application/json")
+                .header("authorization", test_bearer())
                 .body(Body::from(serde_json::to_vec(&update_body).unwrap()))
                 .unwrap(),
         )

@@ -19,7 +19,7 @@ where
 {
     fn format_event(
         &self,
-        _ctx: &FmtContext<'_, S, N>,
+        ctx: &FmtContext<'_, S, N>,
         mut writer: Writer<'_>,
         event: &Event<'_>,
     ) -> fmt::Result {
@@ -36,7 +36,7 @@ where
 
         write!(
             writer,
-            " {DIM}{time}{R}  {ic}{sym}{R} {B}{cc}{label:<7}{R}  {msg}",
+            " {DIM}{time}{R}  {ic}{sym}{R} {B}{cc}{label:<8}{R}  {msg}",
             DIM = colors::DIM,
             R = colors::RESET,
             ic = icon.color,
@@ -56,6 +56,79 @@ where
             )?;
         }
 
+        if let Some(scope) = ctx.event_scope() {
+            let mut span_fields: Vec<(String, String)> = Vec::new();
+
+            for span in scope {
+                let extensions = span.extensions();
+                if let Some(fields) = extensions.get::<SpanFields>() {
+                    for (k, v) in &fields.0 {
+                        if !span_fields.iter().any(|(ek, _)| ek == k)
+                            && !visitor.fields.iter().any(|(ek, _)| ek == k)
+                        {
+                            span_fields.push((k.clone(), v.clone()));
+                        }
+                    }
+                }
+            }
+
+            for (key, value) in &span_fields {
+                write!(
+                    writer,
+                    "  {DIM}{key}{R}={value}",
+                    DIM = colors::DIM,
+                    R = colors::RESET,
+                )?;
+            }
+        }
+
         writeln!(writer)
+    }
+}
+
+#[derive(Default)]
+pub struct SpanFields(pub Vec<(String, String)>);
+
+pub struct SpanFieldLayer;
+
+impl<S> tracing_subscriber::Layer<S> for SpanFieldLayer
+where
+    S: tracing::Subscriber + for<'a> LookupSpan<'a>,
+{
+    fn on_new_span(
+        &self,
+        attrs: &tracing::span::Attributes<'_>,
+        id: &tracing::span::Id,
+        ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        if let Some(span) = ctx.span(id) {
+            let mut fields = SpanFields::default();
+            let mut visitor = MessageVisitor::new();
+            attrs.record(&mut visitor);
+            fields.0 = visitor.fields;
+            span.extensions_mut().insert(fields);
+        }
+    }
+
+    fn on_record(
+        &self,
+        id: &tracing::span::Id,
+        values: &tracing::span::Record<'_>,
+        ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        if let Some(span) = ctx.span(id) {
+            let mut visitor = MessageVisitor::new();
+            values.record(&mut visitor);
+            let mut extensions = span.extensions_mut();
+            if let Some(fields) = extensions.get_mut::<SpanFields>() {
+                for (k, v) in visitor.fields {
+                    if let Some(existing) = fields.0.iter_mut().find(|(ek, _)| *ek == k) {
+                        existing.1 = v;
+                    } else {
+                        fields.0.push((k, v));
+                    }
+                }
+            }
+        }
     }
 }

@@ -14,8 +14,10 @@ use crate::collector::SystemCollector;
 use crate::config::AgentConfig;
 use crate::exporter::{GrpcClient, RetryPolicy, SendLoop};
 use crate::persistence::{AgentPersistedState, VolumeLayout};
+use crate::plugin::PluginScheduler;
 use crate::scheduler::ScheduledTask;
 use crate::stream::StreamClient;
+use sentinel_common::logging;
 
 const COMPACTION_THRESHOLD_MB: u64 = 32;
 const STATE_SAVE_INTERVAL_SECS: u64 = 60;
@@ -43,7 +45,9 @@ pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn s
     );
 
     let segment_bytes = config.buffer.segment_size_mb * 1024 * 1024;
+    let sw = logging::stopwatch();
     let wal = Wal::open(Path::new(&config.buffer.wal_dir), true, segment_bytes)?;
+    tracing::info!(target: "boot", "WAL opened{sw}");
 
     run_compaction_if_needed(&config.buffer.wal_dir, &wal)?;
 
@@ -73,13 +77,14 @@ pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn s
 
     let (metrics_tx, metrics_rx) = mpsc::channel(256);
 
-    spawn_collector(config.collect.interval_seconds, metrics_tx);
+    spawn_collector(config.collect.interval_seconds, metrics_tx.clone());
+    spawn_plugin_scheduler(&config, metrics_tx);
     spawn_batcher(agent_id.clone(), wal.clone(), metrics_rx, resume_seq);
 
     if legacy_mode {
         spawn_legacy_sender(
             config.server.clone(),
-            agent_id,
+            agent_id.clone(),
             secret,
             wal.clone(),
             state.clone(),
@@ -87,7 +92,7 @@ pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn s
     } else {
         spawn_stream_sender(
             config.server.clone(),
-            agent_id,
+            agent_id.clone(),
             secret,
             wal.clone(),
             state.clone(),
@@ -97,10 +102,10 @@ pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn s
     spawn_api(config.api_port, state).await;
     spawn_state_saver(persisted.clone(), wal.clone(), layout.state_dir());
 
-    tracing::info!(target: "system", "Agent running");
+    tracing::info!(target: "system", agent_id = %agent_id, "Agent running");
     crate::shutdown::wait_for_shutdown().await;
 
-    tracing::info!(target: "system", "Shutting down");
+    tracing::info!(target: "system", agent_id = %agent_id, "Shutting down");
     {
         let w = wal.lock().await;
         let _ = w.save_meta();
@@ -160,10 +165,11 @@ fn run_compaction_if_needed(wal_dir: &str, wal: &Wal) -> Result<(), Box<dyn std:
     let threshold = COMPACTION_THRESHOLD_MB * 1024 * 1024;
     let dir = Path::new(wal_dir);
     if needs_compaction(dir, threshold)? {
+        let sw = logging::stopwatch();
         tracing::info!(target: "boot", "WAL compaction needed, running");
         let meta = wal.save_meta()?;
         compact(dir, &meta)?;
-        tracing::info!(target: "boot", "WAL compaction complete");
+        tracing::info!(target: "boot", "WAL compaction complete{sw}");
     }
     Ok(())
 }
@@ -191,7 +197,7 @@ fn spawn_batcher(
             let encoded = BatchComposer::encode_batch(&batch);
             let mut w = wal.lock().await;
             if let Err(e) = w.append(encoded) {
-                tracing::error!(error = %e, "WAL write failed");
+                tracing::error!(target: "data", error = %e, "WAL write failed");
             }
         }
     });
@@ -212,7 +218,7 @@ fn spawn_legacy_sender(
         loop {
             match GrpcClient::connect(&server, agent_id.clone(), &secret, None).await {
                 Ok(mut client) => {
-                    tracing::info!(target: "net", "Connected to server");
+                    tracing::info!(target: "conn", server = %server, "Connected to server");
                     state.set_ready(true);
 
                     loop {
@@ -223,11 +229,11 @@ fn spawn_legacy_sender(
                                 for _ in 0..n {
                                     state.increment_batches_sent();
                                 }
-                                tracing::debug!(sent = n, "batches sent");
+                                tracing::debug!(target: "data", sent = n, "Batches sent");
                             }
                             Ok(_) => {}
                             Err(e) => {
-                                tracing::warn!(target: "net", error = %e, "Send failed, will reconnect");
+                                tracing::warn!(target: "conn", error = %e, "Send failed, will reconnect");
                                 state.increment_batches_failed();
                                 break;
                             }
@@ -235,7 +241,7 @@ fn spawn_legacy_sender(
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(target: "net", error = %e, "Server unreachable, retrying in 10s");
+                    tracing::warn!(target: "conn", error = %e, server = %server, "Server unreachable, retrying in 10s");
                     state.set_ready(false);
                 }
             }
@@ -274,13 +280,18 @@ async fn spawn_api(port: u16, state: AgentState) {
     tokio::spawn(async move {
         match TcpListener::bind(&addr).await {
             Ok(listener) => {
-                tracing::info!(target: "net", addr = %addr, "HTTP API listening");
+                tracing::info!(target: "rest", addr = %addr, "HTTP API listening");
                 if let Err(e) = api::serve(listener, state).await {
-                    tracing::error!(target: "net", error = %e, "HTTP API error");
+                    tracing::error!(target: "rest", error = %e, "HTTP API error");
                 }
             }
             Err(e) => {
-                tracing::error!(target: "net", error = %e, addr = %addr, "Failed to bind HTTP API")
+                tracing::error!(
+                    target: "rest",
+                    error = %e,
+                    "{}",
+                    sentinel_common::logging::actionable::port_in_use(&addr, &e)
+                );
             }
         }
     });
@@ -320,4 +331,22 @@ fn resolve_secret(config: &AgentConfig) -> Result<Vec<u8>, Box<dyn std::error::E
     }
     tracing::warn!(target: "auth", "No secret configured, HMAC signing will use an empty key");
     Ok(Vec::new())
+}
+
+fn spawn_plugin_scheduler(
+    config: &AgentConfig,
+    tx: mpsc::Sender<Vec<sentinel_common::proto::Metric>>,
+) {
+    if !config.plugins.enabled {
+        tracing::info!(target: "plugin", "Plugin system disabled");
+        return;
+    }
+
+    let mut scheduler = PluginScheduler::new(config.plugins.clone());
+    scheduler.discover();
+
+    if scheduler.loaded_count() > 0 {
+        let _handle = scheduler.spawn(tx);
+        tracing::info!(target: "plugin", "Plugin scheduler started");
+    }
 }

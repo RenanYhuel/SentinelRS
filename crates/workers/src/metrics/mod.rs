@@ -6,7 +6,15 @@ pub mod worker_metrics;
 mod tests {
     use super::exposition::render_prometheus;
     use super::worker_metrics::WorkerMetrics;
+    use sqlx::postgres::PgPoolOptions;
     use std::time::Instant;
+
+    fn test_pool() -> sqlx::PgPool {
+        PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://fake@localhost/fake")
+            .unwrap()
+    }
 
     #[test]
     fn counters_increment() {
@@ -29,14 +37,17 @@ mod tests {
         assert_eq!(count, 1);
     }
 
-    #[test]
-    fn prometheus_output_contains_metric_names() {
+    #[tokio::test]
+    async fn prometheus_output_contains_metric_names() {
         let m = WorkerMetrics::new();
         m.inc_batches_processed();
         m.add_rows_inserted(42);
-        let output = render_prometheus(&m, "test-worker");
+        let pool = test_pool();
+        let output = render_prometheus(&m, "test-worker", &pool);
         assert!(output.contains("sentinel_worker_batches_processed_total"));
         assert!(output.contains("sentinel_worker_rows_inserted_total"));
         assert!(output.contains("# TYPE sentinel_worker_db_latency_us summary"));
+        assert!(output.contains("sentinel_worker_pool_size"));
+        assert!(output.contains("sentinel_worker_pool_idle"));
     }
 }

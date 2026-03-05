@@ -1,15 +1,13 @@
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
+use rand::Rng;
 
 const TOKEN_BYTES: usize = 32;
 
 pub fn generate_bootstrap_token() -> String {
-    let bytes: Vec<u8> = (0..TOKEN_BYTES).map(|_| rand_byte()).collect();
-    URL_SAFE_NO_PAD.encode(bytes)
-}
-
-fn rand_byte() -> u8 {
-    uuid::Uuid::new_v4().as_bytes()[0]
+    let mut buf = [0u8; TOKEN_BYTES];
+    rand::thread_rng().fill(&mut buf);
+    URL_SAFE_NO_PAD.encode(buf)
 }
 
 #[cfg(test)]

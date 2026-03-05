@@ -26,6 +26,12 @@ pub async fn test_notifier(
         "slack" => validate_slack(&body.config),
         "discord" => validate_discord(&body.config),
         "smtp" => validate_smtp(&body.config),
+        "telegram" => validate_telegram(&body.config),
+        "pagerduty" => validate_pagerduty(&body.config),
+        "teams" => validate_teams(&body.config),
+        "opsgenie" => validate_opsgenie(&body.config),
+        "gotify" => validate_gotify(&body.config),
+        "ntfy" => validate_ntfy(&body.config),
         _ => Err("unknown notifier type".into()),
     };
 
@@ -46,10 +52,8 @@ fn validate_webhook(config: &serde_json::Value) -> Result<String, String> {
         .get("url")
         .and_then(|v| v.as_str())
         .ok_or("missing 'url' field")?;
-    if !url.starts_with("http://") && !url.starts_with("https://") {
-        return Err("url must start with http:// or https://".into());
-    }
-    Ok(format!("webhook config valid (url: {})", url))
+    validate_url(url)?;
+    Ok(format!("webhook config valid (url: {url})"))
 }
 
 fn validate_slack(config: &serde_json::Value) -> Result<String, String> {
@@ -88,6 +92,82 @@ fn validate_smtp(config: &serde_json::Value) -> Result<String, String> {
         .and_then(|v| v.as_str())
         .ok_or("missing 'to' field")?;
     Ok("smtp config valid".into())
+}
+
+fn validate_telegram(config: &serde_json::Value) -> Result<String, String> {
+    config
+        .get("bot_token")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'bot_token' field")?;
+    config
+        .get("chat_id")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'chat_id' field")?;
+    Ok("telegram config valid".into())
+}
+
+fn validate_pagerduty(config: &serde_json::Value) -> Result<String, String> {
+    let key = config
+        .get("routing_key")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'routing_key' field")?;
+    if key.len() < 10 {
+        return Err("routing_key seems too short".into());
+    }
+    Ok("pagerduty config valid".into())
+}
+
+fn validate_teams(config: &serde_json::Value) -> Result<String, String> {
+    let url = config
+        .get("webhook_url")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'webhook_url' field")?;
+    validate_url(url)?;
+    Ok("teams config valid".into())
+}
+
+fn validate_opsgenie(config: &serde_json::Value) -> Result<String, String> {
+    let key = config
+        .get("api_key")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'api_key' field")?;
+    if key.is_empty() {
+        return Err("api_key must not be empty".into());
+    }
+    Ok("opsgenie config valid".into())
+}
+
+fn validate_gotify(config: &serde_json::Value) -> Result<String, String> {
+    let url = config
+        .get("server_url")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'server_url' field")?;
+    validate_url(url)?;
+    config
+        .get("token")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'token' field")?;
+    Ok("gotify config valid".into())
+}
+
+fn validate_ntfy(config: &serde_json::Value) -> Result<String, String> {
+    let url = config
+        .get("server_url")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'server_url' field")?;
+    validate_url(url)?;
+    config
+        .get("topic")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'topic' field")?;
+    Ok("ntfy config valid".into())
+}
+
+fn validate_url(url: &str) -> Result<(), String> {
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("url must start with http:// or https://".into());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -147,5 +227,65 @@ mod tests {
     fn smtp_missing_host() {
         let cfg = json!({"from": "a@b.com", "to": "c@d.com"});
         assert!(validate_smtp(&cfg).is_err());
+    }
+
+    #[test]
+    fn telegram_valid() {
+        let cfg = json!({"bot_token": "123:ABC", "chat_id": "-100123"});
+        assert!(validate_telegram(&cfg).is_ok());
+    }
+
+    #[test]
+    fn telegram_missing_token() {
+        let cfg = json!({"chat_id": "-100123"});
+        assert!(validate_telegram(&cfg).is_err());
+    }
+
+    #[test]
+    fn pagerduty_valid() {
+        let cfg = json!({"routing_key": "abcdef123456789"});
+        assert!(validate_pagerduty(&cfg).is_ok());
+    }
+
+    #[test]
+    fn pagerduty_too_short() {
+        let cfg = json!({"routing_key": "abc"});
+        assert!(validate_pagerduty(&cfg).is_err());
+    }
+
+    #[test]
+    fn teams_valid() {
+        let cfg = json!({"webhook_url": "https://outlook.office.com/webhook/xxx"});
+        assert!(validate_teams(&cfg).is_ok());
+    }
+
+    #[test]
+    fn opsgenie_valid() {
+        let cfg = json!({"api_key": "some-key-here"});
+        assert!(validate_opsgenie(&cfg).is_ok());
+    }
+
+    #[test]
+    fn gotify_valid() {
+        let cfg = json!({"server_url": "https://gotify.example.com", "token": "abc"});
+        assert!(validate_gotify(&cfg).is_ok());
+    }
+
+    #[test]
+    fn gotify_missing_token() {
+        let cfg = json!({"server_url": "https://gotify.example.com"});
+        assert!(validate_gotify(&cfg).is_err());
+    }
+
+    #[test]
+    fn ntfy_valid() {
+        let cfg = json!({"server_url": "https://ntfy.sh", "topic": "sentinel"});
+        assert!(validate_ntfy(&cfg).is_ok());
+    }
+
+    #[test]
+    fn ntfy_missing_topic() {
+        let cfg = json!({"server_url": "https://ntfy.sh"});
+        assert!(validate_ntfy(&cfg).is_err());
     }
 }

@@ -10,7 +10,8 @@ pub async fn run(mode: OutputMode) -> Result<()> {
         theme::print_header("Edit Configuration");
     }
 
-    let server_url = input::text("Server URL", &current.server_url)?;
+    let server_url = input::text("Server REST URL", current.server_url())?;
+    let grpc_url = input::text("Server gRPC URL", &current.server.grpc_url)?;
 
     let sp = spinner::create("Testing connection...");
     let api = crate::client::ApiClient::new(&server_url);
@@ -22,13 +23,15 @@ pub async fn run(mode: OutputMode) -> Result<()> {
     }
 
     let output_options = &["human", "json"];
-    let default_idx = if current.output == "json" { 1 } else { 0 };
+    let default_idx = if current.output() == "json" { 1 } else { 0 };
     let idx = select::select_option("Default output format", output_options).unwrap_or(default_idx);
 
-    let cfg = CliConfig {
-        server_url,
-        output: output_options[idx].to_string(),
-    };
+    let mut cfg = CliConfig::default();
+    cfg.server.url = server_url;
+    cfg.server.grpc_url = grpc_url;
+    cfg.defaults.output_format = output_options[idx].to_string();
+    cfg.auth = current.auth.clone();
+    cfg.docker = current.docker.clone();
 
     store::save(&cfg)?;
     print_success("Configuration updated");

@@ -4,7 +4,18 @@ use clap::Args;
 use crate::client;
 use crate::output::{input, print_json, select, spinner, theme, OutputMode};
 
-const NOTIFIER_TYPES: &[&str] = &["webhook", "slack", "discord", "smtp"];
+const NOTIFIER_TYPES: &[&str] = &[
+    "webhook",
+    "slack",
+    "discord",
+    "smtp",
+    "telegram",
+    "pagerduty",
+    "teams",
+    "opsgenie",
+    "gotify",
+    "ntfy",
+];
 
 #[derive(Args)]
 pub struct TestArgs {

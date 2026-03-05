@@ -15,7 +15,7 @@ pub fn router(state: Arc<WorkerState>) -> Router {
         )
         .route(
             "/metrics",
-            get(metrics::metrics).with_state(Arc::clone(&state.metrics)),
+            get(metrics::metrics).with_state(Arc::clone(&state)),
         )
         .route("/status", get(status::status).with_state(state))
 }
@@ -33,11 +33,17 @@ mod tests {
     use crate::metrics::worker_metrics::WorkerMetrics;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
+    use sqlx::postgres::PgPoolOptions;
     use std::sync::atomic::AtomicU64;
     use std::time::Duration;
     use tower::ServiceExt;
 
     fn test_state() -> Arc<WorkerState> {
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://fake@localhost/fake")
+            .unwrap();
+
         Arc::new(WorkerState {
             identity: WorkerIdentity::generate(),
             metrics: WorkerMetrics::new(),
@@ -45,6 +51,7 @@ mod tests {
             semaphore: Arc::new(BatchSemaphore::new(100)),
             in_flight: Arc::new(AtomicU64::new(0)),
             registry: None,
+            pool,
         })
     }
 

@@ -11,6 +11,8 @@ pub struct Rule {
     pub for_duration_ms: i64,
     pub severity: Severity,
     pub annotations: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub notifier_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]

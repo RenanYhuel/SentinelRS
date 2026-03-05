@@ -2,237 +2,237 @@
 
 ## Agent Configuration
 
-The agent reads a YAML configuration file. Default lookup paths:
-
-1. Path provided via `--config` CLI flag
-2. `~/.config/sentinel/agent.yml`
-3. `/etc/sentinel/agent.yml`
+The agent reads its configuration from a YAML file. Default path: `./sentinel-agent.yml`.
 
 ### Full Reference
 
 ```yaml
-# Assigned by the server during registration.
-# Leave null to auto-detect from hostname.
+# Unique agent identifier. Set to null for auto-generation from hostname.
 agent_id: null
 
-# Server URL for gRPC communication.
-server: https://sentinel.example.com:8443
+# Server connection
+server: "http://localhost:50051"
 
-# Agent secret (base64-encoded). Used for HMAC batch signing.
-# Can also be set via SENTINEL_AGENT_SECRET or SENTINEL_MASTER_KEY env vars.
-secret: "base64-encoded-secret-here"
+# Shared secret for HMAC signing (can also be set via env var)
+secret: null
 
-# Metric collection settings.
+# Collection settings
 collect:
-    # Interval between collection cycles (seconds). Must be > 0.
-    interval_seconds: 10
+    interval_seconds: 10 # How often to collect metrics
+    cpu: true # Collect CPU usage
+    memory: true # Collect memory usage
+    disk: true # Collect disk usage
 
-    # Toggle individual metric collectors.
-    metrics:
-        cpu: true
-        mem: true
-        disk: true
+# WASM plugin directory
+plugins_dir: "./plugins"
 
-# Directory containing WASM plugin files (.wasm + .manifest.yml).
-plugins_dir: /var/lib/sentinel/plugins
-
-# Write-Ahead Log settings.
+# Write-Ahead Log buffer
 buffer:
-    # Directory for WAL segment files. Required.
-    wal_dir: /var/lib/sentinel/wal
+    wal_dir: "./data/wal" # WAL storage directory
+    segment_size_mb: 16 # Max segment file size
+    max_retention_days: 7 # Auto-cleanup after N days
 
-    # Maximum size of a single WAL segment (MB).
-    segment_size_mb: 16
-
-    # Automatically discard WAL data older than this (days).
-    max_retention_days: 7
-
-# Security and key management.
+# Security settings
 security:
-    # Key store path. "auto" resolves to ~/.local/share/sentinel/keys.
-    key_store: auto
+    key_store: "auto" # "auto" | "file" | path to key file
+    rotation_check_interval_hours: 24 # How often to check for key rotation
 
-    # How often to check for key rotation (hours).
-    rotation_check_interval_hours: 24
-
-# Local HTTP API port for health checks and Prometheus metrics.
-# Endpoints: /healthz, /ready, /metrics
-api_port: 9090
-```
-
-### Validation Rules
-
-| Field                      | Rule              |
-| -------------------------- | ----------------- |
-| `server`                   | Must be non-empty |
-| `collect.interval_seconds` | Must be > 0       |
-| `buffer.wal_dir`           | Must be non-empty |
-
-Use `sentinel config validate` to check a config file before deploying.
-
-### Agent CLI Options
-
-```
-Usage: sentinel_agent [OPTIONS]
-
-Options:
-  -c, --config <PATH>  Configuration file path (required)
-  -V, --version        Print version
-  -h, --help           Print help
+# Local API port (for health checks and debugging)
+api_port: 9100
 ```
 
 ### Agent Secret Resolution
 
-The agent resolves its signing secret with the following precedence:
+The agent resolves its HMAC secret in order:
 
-1. `secret` field in the config file (base64-encoded)
+1. `secret` field in the YAML config file
 2. `SENTINEL_AGENT_SECRET` environment variable
 3. `SENTINEL_MASTER_KEY` environment variable
 
+If none is set, the agent cannot authenticate and will fail to connect.
+
+### Environment Variables (Agent)
+
+| Variable                | Description                   | Default                  |
+| ----------------------- | ----------------------------- | ------------------------ |
+| `SENTINEL_AGENT_SECRET` | Agent HMAC secret             | —                        |
+| `SENTINEL_MASTER_KEY`   | Fallback shared key           | —                        |
+| `SERVER_URL`            | gRPC server address           | `http://localhost:50051` |
+| `COLLECT_INTERVAL`      | Collection interval (seconds) | `10`                     |
+| `BOOTSTRAP_TOKEN`       | One-time provisioning token   | —                        |
+| `RUST_LOG`              | Log level filter              | `info`                   |
+
 ## Server Configuration
 
-The server uses a `ServerConfig` struct with defaults that can be overridden via CLI flags or environment variables.
+The server is configured entirely through CLI flags and environment variables.
 
-| Setting               | Default                   | CLI Flag         | Env Var        | Description                          |
-| --------------------- | ------------------------- | ---------------- | -------------- | ------------------------------------ |
-| `grpc_addr`           | `0.0.0.0:50051`           | `--grpc-addr`    | `GRPC_ADDR`    | gRPC listener address                |
-| `rest_addr`           | `0.0.0.0:8080`            | `--rest-addr`    | `REST_ADDR`    | REST API listener address            |
-| `jwt_secret`          | `change-me-in-production` | `--jwt-secret`   | `JWT_SECRET`   | Secret for JWT HMAC-SHA256 signing   |
-| `nats_url`            | `nats://127.0.0.1:4222`   | `--nats-url`     | `NATS_URL`     | NATS server URL for JetStream        |
-| `database_url`        | —                         | `--database-url` | `DATABASE_URL` | PostgreSQL URL (enables persistence) |
-| `rate_limit_rps`      | `100`                     | —                | —              | Maximum requests per second          |
-| `key_grace_period_ms` | `86400000` (24h)          | —                | —              | Grace period after key rotation      |
-| `replay_window_ms`    | `300000` (5min)           | —                | —              | Time window for replay detection     |
-
-**Precedence:** CLI flags > environment variables > defaults.
-
-### Server CLI Options
-
-```
-Usage: sentinel_server [OPTIONS]
-
-Options:
-      --grpc-addr <ADDR>   gRPC listen address  (default: 0.0.0.0:50051)
-      --grpc-port <PORT>   gRPC listen port     (default: 50051)
-      --rest-addr <ADDR>   REST listen address  (default: 0.0.0.0:8080)
-      --rest-port <PORT>   REST listen port     (default: 8080)
-      --jwt-secret <KEY>   JWT signing secret
-      --nats-url <URL>     NATS server URL     (default: nats://127.0.0.1:4222)
-      --database-url <URL> PostgreSQL URL      (optional, enables persistence)
-      --tls-cert <PATH>    TLS certificate path
-      --tls-key <PATH>     TLS private key path
-      --tls-ca <PATH>      TLS CA certificate path
-  -V, --version            Print version
-  -h, --help               Print help
-```
-
-### TLS
-
-TLS is optional. When configured, both gRPC and REST listeners use TLS.
-
-```yaml
-tls:
-    cert_path: /path/to/server-cert.pem
-    key_path: /path/to/server-key.pem
-    ca_path: /path/to/ca-cert.pem # optional — enables mutual TLS
-```
-
-### Logging
-
-All binaries use `tracing` with JSON-formatted output. Control verbosity with `RUST_LOG`:
+### CLI Flags
 
 ```bash
-# Examples
-RUST_LOG=info ./sentinel_server
-RUST_LOG=sentinel_server=debug,tower=warn ./sentinel_server
-RUST_LOG=trace ./sentinel_server    # very verbose — not recommended in production
+sentinel_server \
+  --grpc-addr    0.0.0.0:50051 \
+  --rest-addr    0.0.0.0:8080 \
+  --jwt-secret   "your-jwt-secret" \
+  --nats-url     nats://localhost:4222 \
+  --database-url "postgres://sentinel:sentinel@localhost:5432/sentinel"
+```
+
+### Environment Variables (Server)
+
+| Variable              | Flag             | Default                 | Description                   |
+| --------------------- | ---------------- | ----------------------- | ----------------------------- |
+| `GRPC_ADDR`           | `--grpc-addr`    | `0.0.0.0:50051`         | gRPC listen address           |
+| `REST_ADDR`           | `--rest-addr`    | `0.0.0.0:8080`          | REST API listen address       |
+| `JWT_SECRET`          | `--jwt-secret`   | —                       | Secret for JWT token signing  |
+| `NATS_URL`            | `--nats-url`     | `nats://localhost:4222` | NATS connection URL           |
+| `DATABASE_URL`        | `--database-url` | —                       | PostgreSQL connection string  |
+| `RATE_LIMIT_RPS`      | —                | `100`                   | REST API rate limit (req/sec) |
+| `KEY_GRACE_PERIOD_MS` | —                | `86400000` (24h)        | Key rotation grace period     |
+| `REPLAY_WINDOW_MS`    | —                | `300000` (5min)         | Anti-replay timestamp window  |
+| `RUST_LOG`            | —                | `info`                  | Log level filter              |
+
+### TLS Configuration (Optional)
+
+```bash
+sentinel_server \
+  --tls-cert /path/to/cert.pem \
+  --tls-key  /path/to/key.pem \
+  --tls-ca   /path/to/ca.pem     # Enables mTLS (client cert verification)
+```
+
+Generate development certificates:
+
+```bash
+./scripts/gen-dev-certs.sh
 ```
 
 ## Worker Configuration
 
-Workers are configured entirely through environment variables.
+Workers use environment variables only.
 
-| Variable          | Default                 | Description                                   |
-| ----------------- | ----------------------- | --------------------------------------------- |
-| `NATS_URL`        | `nats://127.0.0.1:4222` | NATS server URL                               |
-| `BATCH_SIZE`      | `50`                    | Number of messages per JetStream pull         |
-| `WORKER_API_ADDR` | `0.0.0.0:9090`          | Bind address for health/metrics HTTP endpoint |
-| `RUST_LOG`        | `info`                  | Log verbosity                                 |
+| Variable          | Default                 | Description                  |
+| ----------------- | ----------------------- | ---------------------------- |
+| `NATS_URL`        | `nats://localhost:4222` | NATS connection URL          |
+| `DATABASE_URL`    | —                       | PostgreSQL connection string |
+| `BATCH_SIZE`      | `100`                   | Batch processing size        |
+| `WORKER_API_ADDR` | `0.0.0.0:9200`          | Health check endpoint        |
+| `RUST_LOG`        | `info`                  | Log level filter             |
 
-### NATS Stream Settings
+## CLI Configuration
 
-Default stream configuration used by the workers:
+The CLI stores its configuration in `~/.config/sentinel/config.toml`.
 
-| Setting        | Value                                     |
-| -------------- | ----------------------------------------- |
-| Stream name    | Defined in `sentinel_common::nats_config` |
-| Consumer       | Durable pull consumer with explicit ack   |
-| Max deliveries | 5 (after which the message is discarded)  |
+### Create with wizard
 
-## Environment Variables Summary
-
-| Variable                | Used By      | Description                                                          |
-| ----------------------- | ------------ | -------------------------------------------------------------------- |
-| `RUST_LOG`              | All binaries | Tracing filter (e.g., `info`, `debug`, `sentinel_agent=trace`)       |
-| `NATS_URL`              | Workers      | NATS connection URL                                                  |
-| `BATCH_SIZE`            | Workers      | Messages per pull batch                                              |
-| `WORKER_API_ADDR`       | Workers      | Worker HTTP bind address                                             |
-| `SENTINEL_MASTER_KEY`   | CLI / Agent  | AES-256-GCM master key for encrypted key store (first 32 bytes used) |
-| `SENTINEL_AGENT_SECRET` | Agent        | Agent signing secret (alternative to config `secret` field)          |
-| `GRPC_ADDR`             | Server       | Full gRPC listen address (e.g. `0.0.0.0:50051`)                      |
-| `GRPC_PORT`             | Server       | gRPC port only (e.g. `50051`)                                        |
-| `REST_ADDR`             | Server       | Full REST listen address (e.g. `0.0.0.0:8080`)                       |
-| `REST_PORT`             | Server       | REST port only (e.g. `8080`)                                         |
-| `JWT_SECRET`            | Server       | JWT signing secret                                                   |
-
-## WASM Plugin Manifest
-
-Each plugin requires a `.manifest.yml` alongside its `.wasm` file in the plugins directory.
-
-```yaml
-name: my-plugin
-version: "1.0.0"
-entry_fn: collect # exported WASM function name
-capabilities: # optional
-    - http_get
-    - read_file
-    - metric_builder
-resource_limits:
-    max_memory_mb: 64 # default
-    timeout_ms: 5000 # default
-    max_metrics: 1000 # default
-metadata: # arbitrary key-value pairs
-    author: "Example"
+```bash
+sentinel init
 ```
 
-See [security.md](security.md) for details on plugin sandboxing and signing.
+### Manual creation
 
-## Alert Rule Schema
+```toml
+[server]
+url = "http://localhost:8080"
 
-Rules are managed via the REST API or CLI. JSON format:
+[output]
+mode = "human"    # "human" or "json"
+```
+
+### CLI Global Flags
+
+These override config file values:
+
+| Flag       | Description                       |
+| ---------- | --------------------------------- |
+| `--json`   | Force JSON output mode            |
+| `--server` | Override server URL for this call |
+| `--config` | Use alternate config file path    |
+
+### Manage with commands
+
+```bash
+# Show current config
+sentinel config show
+
+# Set a value
+sentinel config set server.url http://my-server:8080
+
+# Interactive editor
+sentinel config edit
+
+# Print config file path
+sentinel config path
+
+# Reset to defaults
+sentinel config reset
+```
+
+## Alert Rules
+
+Alert rules are managed via CLI or REST API. JSON schema:
 
 ```json
 {
     "name": "High CPU",
     "agent_pattern": "*",
-    "metric_name": "cpu_usage",
-    "condition": "GreaterThan",
+    "metric_name": "cpu.usage_percent",
+    "condition": "gt",
     "threshold": 90.0,
     "for_duration_ms": 60000,
-    "severity": "Critical",
+    "severity": "critical",
     "annotations": {
-        "description": "CPU usage exceeds 90% for 1 minute"
-    }
+        "summary": "CPU usage exceeds 90%",
+        "runbook": "https://wiki.example.com/high-cpu"
+    },
+    "enabled": true,
+    "notifier_ids": ["uuid-of-discord-notifier"]
 }
 ```
 
-| Field             | Required | Default   | Description                                                         |
-| ----------------- | -------- | --------- | ------------------------------------------------------------------- |
-| `name`            | Yes      | —         | Human-readable rule name                                            |
-| `metric_name`     | Yes      | —         | Metric to evaluate                                                  |
-| `condition`       | Yes      | —         | `GreaterThan`, `LessThan`, `GreaterOrEqual`, `LessOrEqual`, `Equal` |
-| `threshold`       | Yes      | —         | Numeric threshold                                                   |
-| `agent_pattern`   | No       | `*`       | Agent ID pattern (`*` = all, `prefix*` = prefix match)              |
-| `for_duration_ms` | No       | `0`       | Hold duration before firing (0 = immediate)                         |
-| `severity`        | No       | `Warning` | `Info`, `Warning`, `Critical`                                       |
-| `annotations`     | No       | `{}`      | Arbitrary key-value metadata                                        |
+### Conditions
+
+| Condition | Meaning               |
+| --------- | --------------------- |
+| `gt`      | Greater than          |
+| `gte`     | Greater than or equal |
+| `lt`      | Less than             |
+| `lte`     | Less than or equal    |
+| `eq`      | Equal to              |
+| `ne`      | Not equal to          |
+
+### Severity Levels
+
+`info`, `warning`, `critical`
+
+## WASM Plugin Manifest
+
+Plugins are loaded from `plugins_dir`. Each plugin needs a WASM file and optional manifest:
+
+```yaml
+name: "custom-collector"
+version: "1.0.0"
+wasm_file: "custom_collector.wasm"
+config:
+    interval_seconds: 30
+    custom_key: "custom_value"
+```
+
+See [Plugin Development](plugin-development.md) for writing plugins.
+
+## Log Levels
+
+All binaries use `RUST_LOG` for filtering. Examples:
+
+```bash
+# Default
+RUST_LOG=info
+
+# Debug for sentinel crates only
+RUST_LOG=sentinel_server=debug,sentinel_agent=debug
+
+# Trace everything (very verbose)
+RUST_LOG=trace
+
+# Specific module
+RUST_LOG=sentinel_server::stream=debug,info
+```

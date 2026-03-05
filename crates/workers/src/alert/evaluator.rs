@@ -25,6 +25,14 @@ impl Evaluator {
         self.states.clear();
     }
 
+    pub fn notifier_ids_for_rule(&self, rule_id: &str) -> &[String] {
+        self.rules
+            .iter()
+            .find(|r| r.id == rule_id)
+            .map(|r| r.notifier_ids.as_slice())
+            .unwrap_or(&[])
+    }
+
     pub fn evaluate(
         &self,
         agent_id: &str,
@@ -119,6 +127,7 @@ mod tests {
             for_duration_ms: 0,
             severity: Severity::Warning,
             annotations: HashMap::new(),
+            notifier_ids: Vec::new(),
         }
     }
 

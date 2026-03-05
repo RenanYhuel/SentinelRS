@@ -39,3 +39,13 @@ pub fn print_dim(msg: &str) {
 pub fn divider() {
     println!("  {}", "─".repeat(50).dimmed());
 }
+
+pub fn print_table_header(cols: &[&str]) {
+    let row: Vec<String> = cols.iter().map(|c| format!("{:<14}", c)).collect();
+    println!("  {}", row.join("").bold().underline());
+}
+
+pub fn print_table_row(cols: &[&str]) {
+    let row: Vec<String> = cols.iter().map(|c| format!("{:<14}", c)).collect();
+    println!("  {}", row.join(""));
+}

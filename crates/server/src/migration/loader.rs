@@ -53,5 +53,29 @@ pub fn load_all() -> Vec<MigrationFile> {
             filename: "011_add_agents_last_seen.sql",
             sql: include_str!("../../../../migrations/011_add_agents_last_seen.sql"),
         },
+        MigrationFile {
+            filename: "012_create_notifier_configs.sql",
+            sql: include_str!("../../../../migrations/012_create_notifier_configs.sql"),
+        },
+        MigrationFile {
+            filename: "013_create_bootstrap_tokens.sql",
+            sql: include_str!("../../../../migrations/013_create_bootstrap_tokens.sql"),
+        },
+        MigrationFile {
+            filename: "014_add_agent_status_column.sql",
+            sql: include_str!("../../../../migrations/014_add_agent_status_column.sql"),
+        },
+        MigrationFile {
+            filename: "015_add_rule_notifier_ids.sql",
+            sql: include_str!("../../../../migrations/015_add_rule_notifier_ids.sql"),
+        },
+        MigrationFile {
+            filename: "016_notification_history.sql",
+            sql: include_str!("../../../../migrations/016_notification_history.sql"),
+        },
+        MigrationFile {
+            filename: "017_metrics_5m_aggregate.sql",
+            sql: include_str!("../../../../migrations/017_metrics_5m_aggregate.sql"),
+        },
     ]
 }

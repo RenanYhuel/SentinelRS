@@ -25,3 +25,18 @@ pub async fn auth_middleware(
 
     Ok(next.run(request).await)
 }
+
+pub fn require_auth(
+    jwt_secret: Vec<u8>,
+) -> impl Fn(
+    Request,
+    Next,
+) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<Response, StatusCode>> + Send>,
+> + Clone
+       + Send {
+    move |request: Request, next: Next| {
+        let secret = jwt_secret.clone();
+        Box::pin(async move { auth_middleware(request, next, &secret).await })
+    }
+}

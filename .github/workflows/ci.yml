@@ -9,6 +9,8 @@ on:
 env:
     CARGO_TERM_COLOR: always
     RUSTFLAGS: "-D warnings"
+    SCCACHE_GHA_ENABLED: "true"
+    RUSTC_WRAPPER: "sccache"
 
 jobs:
     fmt:
@@ -30,16 +32,9 @@ jobs:
             - uses: dtolnay/rust-toolchain@stable
               with:
                   components: clippy
+            - uses: mozilla-actions/sccache-action@v0.0.7
             - name: Install protoc
               run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-            - uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                      target
-                  key: ${{ runner.os }}-clippy-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: ${{ runner.os }}-clippy-
             - run: cargo clippy --workspace --all-targets -- -D warnings
 
     test:
@@ -49,16 +44,9 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@stable
+            - uses: mozilla-actions/sccache-action@v0.0.7
             - name: Install protoc
               run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-            - uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                      target
-                  key: ${{ runner.os }}-test-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: ${{ runner.os }}-test-
             - run: cargo test --workspace
 
     build:
@@ -82,6 +70,7 @@ jobs:
             - uses: dtolnay/rust-toolchain@stable
               with:
                   targets: ${{ matrix.target }}
+            - uses: mozilla-actions/sccache-action@v0.0.7
             - name: Install system dependencies
               shell: bash
               run: |
@@ -92,33 +81,24 @@ jobs:
                   elif [ "$RUNNER_OS" = "Windows" ]; then
                     choco install protoc -y
                   fi
-            - uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                      target
-                  key: ${{ runner.os }}-build-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: ${{ runner.os }}-build-${{ matrix.target }}-
             - run: cargo build --release --target ${{ matrix.target }}
             - name: Package binaries (Linux/macOS)
               if: runner.os != 'Windows'
               run: |
                   mkdir -p dist
-                  cp target/${{ matrix.target }}/release/sentinel_agent dist/ || true
-                  cp target/${{ matrix.target }}/release/sentinel_server dist/ || true
-                  cp target/${{ matrix.target }}/release/sentinel_workers dist/ || true
-                  cp target/${{ matrix.target }}/release/sentinel_cli dist/ || true
+                  for bin in sentinel_agent sentinel_server sentinel_workers sentinel_cli; do
+                    cp target/${{ matrix.target }}/release/$bin dist/ || true
+                  done
                   tar -czf sentinel-${{ matrix.target }}.tar.gz -C dist .
             - name: Package binaries (Windows)
               if: runner.os == 'Windows'
               shell: pwsh
               run: |
                   New-Item -ItemType Directory -Force -Path dist
-                  Copy-Item target/${{ matrix.target }}/release/sentinel_agent.exe dist/ -ErrorAction SilentlyContinue
-                  Copy-Item target/${{ matrix.target }}/release/sentinel_server.exe dist/ -ErrorAction SilentlyContinue
-                  Copy-Item target/${{ matrix.target }}/release/sentinel_workers.exe dist/ -ErrorAction SilentlyContinue
-                  Copy-Item target/${{ matrix.target }}/release/sentinel_cli.exe dist/ -ErrorAction SilentlyContinue
+                  $bins = @("sentinel_agent", "sentinel_server", "sentinel_workers", "sentinel_cli")
+                  foreach ($b in $bins) {
+                    Copy-Item "target/${{ matrix.target }}/release/$b.exe" dist/ -ErrorAction SilentlyContinue
+                  }
                   Compress-Archive -Path dist/* -DestinationPath sentinel-${{ matrix.target }}.zip
             - uses: actions/upload-artifact@v4
               with:
@@ -155,16 +135,9 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@stable
+            - uses: mozilla-actions/sccache-action@v0.0.7
             - name: Install protoc
               run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-            - uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                      target
-                  key: ${{ runner.os }}-smoke-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: ${{ runner.os }}-smoke-
             - run: cargo build --release
             - name: Run integration smoke tests
               env:

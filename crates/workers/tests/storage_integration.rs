@@ -1,5 +1,6 @@
 use sqlx::PgPool;
 
+use sentinel_common::pool_config::PoolConfig;
 use sentinel_workers::storage::migrator;
 use sentinel_workers::storage::{create_pool, MetricWriter, RawWriter};
 use sentinel_workers::transform::MetricRow;
@@ -8,7 +9,13 @@ use std::collections::HashMap;
 async fn setup_pool() -> PgPool {
     let url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/sentinel".into());
-    create_pool(&url, 2).await.expect("connect to TimescaleDB")
+    let config = PoolConfig {
+        max_connections: 2,
+        ..PoolConfig::default()
+    };
+    create_pool(&url, &config)
+        .await
+        .expect("connect to TimescaleDB")
 }
 
 async fn clean_tables(pool: &PgPool) {

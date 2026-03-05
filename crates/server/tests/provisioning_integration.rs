@@ -41,6 +41,7 @@ impl ProvisioningTestServer {
             registry,
             events,
             300_000,
+            300_000,
             ServerMetrics::new(),
         )
         .with_provisioning(token_store.clone(), None, "grpc://127.0.0.1:50051".into());

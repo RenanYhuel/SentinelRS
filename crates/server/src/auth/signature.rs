@@ -19,7 +19,7 @@ mod tests {
     }
 
     #[test]
-    fn generate_secret_is_16_bytes() {
-        assert_eq!(generate_secret().len(), 16);
+    fn generate_secret_is_32_bytes() {
+        assert_eq!(generate_secret().len(), 32);
     }
 }

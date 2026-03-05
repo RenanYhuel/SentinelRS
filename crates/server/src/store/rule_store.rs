@@ -76,6 +76,7 @@ mod tests {
             severity: "warning".into(),
             annotations: HashMap::new(),
             enabled: true,
+            notifier_ids: Vec::new(),
             created_at_ms: 1000,
             updated_at_ms: 1000,
         }

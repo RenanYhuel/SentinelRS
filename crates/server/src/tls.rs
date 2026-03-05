@@ -25,12 +25,18 @@ impl TlsIdentity {
         })
     }
 
-    pub fn tonic_server_tls(&self) -> Result<tonic::transport::ServerTlsConfig, TlsLoadError> {
+    pub fn tonic_server_tls(
+        &self,
+        require_client_auth: bool,
+    ) -> Result<tonic::transport::ServerTlsConfig, TlsLoadError> {
         let identity = tonic::transport::Identity::from_pem(&self.cert_pem, &self.key_pem);
         let mut tls = tonic::transport::ServerTlsConfig::new().identity(identity);
         if let Some(ca) = &self.ca_pem {
             let ca_cert = tonic::transport::Certificate::from_pem(ca);
             tls = tls.client_ca_root(ca_cert);
+            if require_client_auth {
+                tls = tls.client_auth_optional(false);
+            }
         }
         Ok(tls)
     }

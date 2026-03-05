@@ -6,7 +6,11 @@ mod installer;
 mod manifest;
 mod runtime;
 
+pub mod discovery;
+pub mod scheduler;
+
 pub use error::PluginError;
 pub use installer::{load_blob, sign_blob, store_blob, store_manifest, verify_blob};
 pub use manifest::{Capability, PluginManifest, ResourceLimits};
 pub use runtime::{ExecutionResult, PluginRuntime};
+pub use scheduler::PluginScheduler;

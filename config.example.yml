@@ -10,7 +10,11 @@ collect:
         mem: true
         disk: true
 
-plugins_dir: /var/lib/sentinel/plugins
+plugins:
+    enabled: true
+    dir: /var/lib/sentinel/plugins
+    interval_seconds: 30
+    # signing_key: base64-encoded-key  # optional, verify WASM blobs
 
 buffer:
     wal_dir: /var/lib/sentinel/wal

@@ -16,13 +16,13 @@ pub async fn verify_batch(
     signature: Option<&str>,
 ) -> VerifyResult {
     let Some(sig) = signature else {
-        tracing::warn!(agent_id = %batch.agent_id, "no signature header, skipping verify");
-        return VerifyResult::Skipped;
+        tracing::warn!(agent_id = %batch.agent_id, "unsigned batch rejected");
+        return VerifyResult::Invalid;
     };
 
     let Some(secret) = provider.get_secret(&batch.agent_id).await else {
-        tracing::warn!(agent_id = %batch.agent_id, "no secret available, skipping verify");
-        return VerifyResult::Skipped;
+        tracing::warn!(agent_id = %batch.agent_id, "no secret available, rejecting batch");
+        return VerifyResult::Invalid;
     };
 
     let canonical = canonical_bytes(batch);
@@ -86,26 +86,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_signature_skips() {
+    async fn no_signature_rejects() {
         let batch = test_batch();
         let provider = StaticProvider {
             secrets: HashMap::new(),
         };
         match verify_batch(&provider, &batch, None).await {
-            VerifyResult::Skipped => {}
-            _ => panic!("expected Skipped"),
+            VerifyResult::Invalid => {}
+            _ => panic!("expected Invalid"),
         }
     }
 
     #[tokio::test]
-    async fn no_secret_skips() {
+    async fn no_secret_rejects() {
         let batch = test_batch();
         let provider = StaticProvider {
             secrets: HashMap::new(),
         };
         match verify_batch(&provider, &batch, Some("some-sig")).await {
-            VerifyResult::Skipped => {}
-            _ => panic!("expected Skipped"),
+            VerifyResult::Invalid => {}
+            _ => panic!("expected Invalid"),
         }
     }
 }

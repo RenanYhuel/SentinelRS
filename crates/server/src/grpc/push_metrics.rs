@@ -39,17 +39,18 @@ pub async fn handle_push_metrics_with_config(
     let agent_id = extract_metadata(&request, "x-agent-id").map_err(|e| *e)?;
     let signature = extract_metadata(&request, "x-signature").map_err(|e| *e)?;
     let key_id = extract_metadata_opt(&request, "x-key-id");
-    tracing::info!(%trace_id, %agent_id, "push_metrics request");
+    let span = tracing::info_span!("push_metrics", %trace_id, %agent_id);
+    tracing::debug!(parent: &span, "push_metrics request received");
 
     if agents.get(&agent_id).is_none() {
-        tracing::warn!(%trace_id, %agent_id, "rejected: unknown agent");
+        tracing::warn!(parent: &span, reason = "unknown_agent", "Push rejected");
         return Err(Status::unauthenticated("unknown agent"));
     }
 
     let secret = match agents.find_key_secret(&agent_id, key_id.as_deref(), grace_period_ms) {
         Some(s) => s,
         None => {
-            tracing::warn!(%trace_id, %agent_id, key_id = ?key_id, "rejected: unknown or expired key");
+            tracing::warn!(parent: &span, key_id = ?key_id, reason = "expired_key", "Push rejected");
             return Err(Status::unauthenticated("unknown or expired key"));
         }
     };
@@ -60,7 +61,7 @@ pub async fn handle_push_metrics_with_config(
     if replay_window_ms > 0 && batch.created_at_ms > 0 {
         let age = (now_ms - batch.created_at_ms).abs();
         if age > replay_window_ms {
-            tracing::warn!(%trace_id, %agent_id, %age, %replay_window_ms, "rejected: replay window exceeded");
+            tracing::warn!(parent: &span, %age, %replay_window_ms, reason = "replay_window", "Push rejected");
             return Err(Status::unauthenticated(
                 "batch timestamp outside replay window",
             ));
@@ -69,7 +70,7 @@ pub async fn handle_push_metrics_with_config(
 
     let canonical = sentinel_common::canonicalize::canonical_bytes(&batch);
     if !verify_signature(&secret, &canonical, &signature) {
-        tracing::warn!(%trace_id, %agent_id, "rejected: invalid HMAC signature");
+        tracing::warn!(parent: &span, reason = "invalid_signature", "Push rejected");
         return Err(Status::unauthenticated("invalid signature"));
     }
 
@@ -88,7 +89,13 @@ pub async fn handle_push_metrics_with_config(
         .publish(&batch, Some(&signature), key_id.as_deref())
         .await
     {
-        tracing::error!(batch_id = %batch.batch_id, error = %e, "broker publish failed");
+        tracing::error!(
+            parent: &span,
+            batch_id = %batch.batch_id,
+            error = %e,
+            "{}",
+            sentinel_common::logging::actionable::broker_publish_failed(&batch.batch_id, &e)
+        );
         return Ok(Response::new(PushResponse {
             status: PushStatus::Retry.into(),
             message: "broker unavailable, retry later".into(),

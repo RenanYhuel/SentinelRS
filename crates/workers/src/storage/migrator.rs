@@ -49,6 +49,30 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "011_add_agents_last_seen.sql",
         include_str!("../../../../migrations/011_add_agents_last_seen.sql"),
     ),
+    (
+        "012_create_notifier_configs.sql",
+        include_str!("../../../../migrations/012_create_notifier_configs.sql"),
+    ),
+    (
+        "013_create_bootstrap_tokens.sql",
+        include_str!("../../../../migrations/013_create_bootstrap_tokens.sql"),
+    ),
+    (
+        "014_add_agent_status_column.sql",
+        include_str!("../../../../migrations/014_add_agent_status_column.sql"),
+    ),
+    (
+        "015_add_rule_notifier_ids.sql",
+        include_str!("../../../../migrations/015_add_rule_notifier_ids.sql"),
+    ),
+    (
+        "016_notification_history.sql",
+        include_str!("../../../../migrations/016_notification_history.sql"),
+    ),
+    (
+        "017_metrics_5m_aggregate.sql",
+        include_str!("../../../../migrations/017_metrics_5m_aggregate.sql"),
+    ),
 ];
 
 pub async fn run_migrations(pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {

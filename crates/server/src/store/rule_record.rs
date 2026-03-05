@@ -13,6 +13,8 @@ pub struct RuleRecord {
     pub severity: String,
     pub annotations: HashMap<String, String>,
     pub enabled: bool,
+    #[serde(default)]
+    pub notifier_ids: Vec<String>,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
 }

@@ -21,7 +21,7 @@ pub async fn retry_async<F, Fut, T, E>(config: &RetryConfig, mut f: F) -> Result
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
-    E: std::fmt::Debug,
+    E: std::fmt::Display,
 {
     let mut delay = config.initial_delay;
     let mut last_err = None;
@@ -30,9 +30,13 @@ where
         match f().await {
             Ok(v) => return Ok(v),
             Err(e) => {
-                eprintln!(
-                    "[retry] attempt {attempt}/{} failed: {e:?}",
-                    config.max_attempts
+                tracing::warn!(
+                    target: "retry",
+                    attempt,
+                    max_attempts = config.max_attempts,
+                    delay_ms = delay.as_millis() as u64,
+                    error = %e,
+                    "Operation failed, retrying"
                 );
                 last_err = Some(e);
                 if attempt < config.max_attempts {
@@ -49,7 +53,7 @@ where
 pub fn retry_sync<F, T, E>(config: &RetryConfig, mut f: F) -> Result<T, E>
 where
     F: FnMut() -> Result<T, E>,
-    E: std::fmt::Debug,
+    E: std::fmt::Display,
 {
     let mut delay = config.initial_delay;
     let mut last_err = None;
@@ -58,9 +62,13 @@ where
         match f() {
             Ok(v) => return Ok(v),
             Err(e) => {
-                eprintln!(
-                    "[retry] attempt {attempt}/{} failed: {e:?}",
-                    config.max_attempts
+                tracing::warn!(
+                    target: "retry",
+                    attempt,
+                    max_attempts = config.max_attempts,
+                    delay_ms = delay.as_millis() as u64,
+                    error = %e,
+                    "Operation failed, retrying"
                 );
                 last_err = Some(e);
                 if attempt < config.max_attempts {

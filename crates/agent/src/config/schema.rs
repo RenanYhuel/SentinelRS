@@ -6,12 +6,47 @@ pub struct AgentConfig {
     pub server: String,
     pub secret: Option<String>,
     pub collect: CollectConfig,
-    #[serde(default = "default_plugins_dir")]
-    pub plugins_dir: String,
+    #[serde(default)]
+    pub plugins: PluginConfig,
     pub buffer: BufferConfig,
     pub security: SecurityConfig,
     #[serde(default = "default_api_port")]
     pub api_port: u16,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct PluginConfig {
+    #[serde(default = "default_plugins_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_plugins_dir")]
+    pub dir: String,
+    #[serde(default = "default_plugin_interval_seconds")]
+    pub interval_seconds: u64,
+    #[serde(default = "default_plugin_signing_key")]
+    pub signing_key: Option<String>,
+}
+
+impl Default for PluginConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_plugins_enabled(),
+            dir: default_plugins_dir(),
+            interval_seconds: default_plugin_interval_seconds(),
+            signing_key: default_plugin_signing_key(),
+        }
+    }
+}
+
+fn default_plugins_enabled() -> bool {
+    true
+}
+
+fn default_plugin_interval_seconds() -> u64 {
+    30
+}
+
+fn default_plugin_signing_key() -> Option<String> {
+    None
 }
 
 fn default_api_port() -> u16 {
@@ -90,7 +125,10 @@ collect:
     cpu: true
     mem: true
     disk: true
-plugins_dir: /var/lib/sentinel/plugins
+plugins:
+  enabled: true
+  dir: /var/lib/sentinel/plugins
+  interval_seconds: 30
 buffer:
   wal_dir: /var/lib/sentinel/wal
   segment_size_mb: 16
@@ -106,6 +144,8 @@ security:
         assert!(cfg.collect.metrics.cpu);
         assert_eq!(cfg.buffer.segment_size_mb, 16);
         assert_eq!(cfg.security.key_store, "auto");
+        assert!(cfg.plugins.enabled);
+        assert_eq!(cfg.plugins.interval_seconds, 30);
     }
 
     #[test]
@@ -127,5 +167,8 @@ security: {}
         assert_eq!(cfg.buffer.max_retention_days, 7);
         assert_eq!(cfg.security.key_store, "auto");
         assert_eq!(cfg.security.rotation_check_interval_hours, 24);
+        assert!(cfg.plugins.enabled);
+        assert_eq!(cfg.plugins.dir, "/var/lib/sentinel/plugins");
+        assert_eq!(cfg.plugins.interval_seconds, 30);
     }
 }
