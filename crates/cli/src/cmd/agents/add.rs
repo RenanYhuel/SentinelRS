@@ -64,7 +64,7 @@ async fn deploy_docker_agent(name: &str, token: &str, mode: OutputMode) -> Resul
     let container_name = format!("sentinel-{name}");
 
     let cfg = crate::store::load().unwrap_or_default();
-    let server_url = &cfg.server.grpc_url;
+    let server_url = resolve_docker_grpc_url(&cfg);
     let network = resolve_compose_network(&cfg);
 
     cleanup_existing_container(&container_name).await;
@@ -80,7 +80,7 @@ async fn deploy_docker_agent(name: &str, token: &str, mode: OutputMode) -> Resul
             "-e",
             &format!("BOOTSTRAP_TOKEN={token}"),
             "-e",
-            &format!("SERVER_URL={server_url}"),
+            &format!("SERVER_URL={}", server_url),
             "-v",
             &format!("{container_name}-config:/etc/sentinel"),
             "--network",
@@ -128,24 +128,54 @@ async fn cleanup_existing_container(container_name: &str) {
 async fn wait_for_agent(name: &str, container_name: &str) {
     let sp = spinner::create("Waiting for agent bootstrap...");
 
-    for _ in 0..10 {
+    for _ in 0..15 {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         let output = tokio::process::Command::new("docker")
-            .args(["inspect", "-f", "{{.State.Running}}", container_name])
+            .args(["logs", "--tail", "5", container_name])
             .output()
             .await;
 
-        match output {
-            Ok(o) if String::from_utf8_lossy(&o.stdout).trim() == "true" => {
-                spinner::finish_ok(&sp, &format!("Agent '{name}' is running"));
+        if let Ok(o) = output {
+            let logs = String::from_utf8_lossy(&o.stdout);
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            let combined = format!("{logs}{stderr}");
+
+            if combined.contains("Bootstrap complete")
+                || combined.contains("Agent provisioned")
+                || combined.contains("Configuration loaded")
+            {
+                spinner::finish_ok(&sp, &format!("Agent '{name}' bootstrapped"));
                 return;
             }
-            _ => continue,
+
+            if combined.contains("Bootstrap failed after") {
+                spinner::finish_err(
+                    &sp,
+                    &format!(
+                        "Agent '{name}' bootstrap failed — check: docker logs {container_name}"
+                    ),
+                );
+                return;
+            }
         }
     }
 
-    spinner::finish_err(&sp, &format!("Agent '{name}' did not start in time"));
+    spinner::finish_err(
+        &sp,
+        &format!("Agent '{name}' still bootstrapping — check: docker logs {container_name}"),
+    );
+}
+
+fn resolve_docker_grpc_url(cfg: &crate::store::config::CliConfig) -> String {
+    let port = cfg
+        .server
+        .grpc_url
+        .rsplit(':')
+        .next()
+        .and_then(|p| p.trim_end_matches('/').parse::<u16>().ok())
+        .unwrap_or(50051);
+    format!("http://sentinel-server:{port}")
 }
 
 fn resolve_compose_network(cfg: &crate::store::config::CliConfig) -> String {
