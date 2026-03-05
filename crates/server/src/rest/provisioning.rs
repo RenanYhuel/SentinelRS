@@ -61,6 +61,12 @@ pub async fn generate_install(
 
     token_store.insert(entry);
 
+    tracing::info!(
+        target: "auth",
+        token = %sentinel_common::redact::RedactedSecret(&token),
+        "provisioning token generated"
+    );
+
     let server_url = &state.grpc_public_url;
 
     let install_command = format!(

@@ -6,6 +6,7 @@ pub struct TlsConfig {
     pub cert_path: PathBuf,
     pub key_path: PathBuf,
     pub ca_path: Option<PathBuf>,
+    pub require_client_auth: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +72,9 @@ impl ServerConfig {
                 cert_path: cert,
                 key_path: args.tls_key.unwrap_or_default(),
                 ca_path: args.tls_ca,
+                require_client_auth: std::env::var("TLS_REQUIRE_CLIENT_AUTH")
+                    .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                    .unwrap_or(false),
             });
         }
 

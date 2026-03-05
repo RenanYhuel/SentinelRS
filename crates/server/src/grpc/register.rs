@@ -57,6 +57,12 @@ pub async fn handle_register(
         }
     }
 
+    tracing::info!(
+        parent: &span,
+        %agent_id,
+        "agent registered"
+    );
+
     Ok(Response::new(RegisterResponse {
         agent_id,
         secret: STANDARD.encode(&secret),

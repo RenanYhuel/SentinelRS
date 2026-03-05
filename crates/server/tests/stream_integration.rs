@@ -42,6 +42,7 @@ impl StreamTestServer {
             registry.clone(),
             events.clone(),
             300_000,
+            300_000,
             ServerMetrics::new(),
         );
 

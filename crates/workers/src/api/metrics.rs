@@ -7,11 +7,7 @@ use super::state::WorkerState;
 use crate::metrics::exposition::render_prometheus;
 
 pub async fn metrics(State(state): State<Arc<WorkerState>>) -> impl IntoResponse {
-    let body = render_prometheus(
-        &state.metrics,
-        state.identity.id(),
-        &state.pool,
-    );
+    let body = render_prometheus(&state.metrics, state.identity.id(), &state.pool);
     (
         [(
             header::CONTENT_TYPE,

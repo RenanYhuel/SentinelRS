@@ -1,0 +1,12 @@
+name: hello_metrics
+version: "1.0.0"
+entry_fn: collect
+capabilities:
+    - metric_builder
+resource_limits:
+    max_memory_mb: 16
+    timeout_ms: 2000
+    max_metrics: 10
+metadata:
+    author: sentinel-team
+    description: Example plugin that emits a static metric

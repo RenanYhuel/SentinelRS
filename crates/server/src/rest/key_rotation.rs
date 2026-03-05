@@ -23,6 +23,13 @@ pub async fn rotate_key(
         .rotate_key(&agent_id)
         .ok_or(StatusCode::NOT_FOUND)?;
 
+    tracing::info!(
+        target: "auth",
+        %agent_id,
+        %new_key_id,
+        "HMAC key rotated"
+    );
+
     Ok(Json(RotateKeyResponse {
         agent_id,
         new_key_id,

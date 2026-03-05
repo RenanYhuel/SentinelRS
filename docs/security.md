@@ -23,6 +23,14 @@ sentinel_server \
   --tls-ca   /path/to/ca.pem
 ```
 
+To require client certificates (strict mTLS), set:
+
+```bash
+TLS_REQUIRE_CLIENT_AUTH=true
+```
+
+When enabled, connections without a valid client certificate are rejected at the TLS layer.
+
 ## Batch Signing (HMAC-SHA256)
 
 Every metric batch is signed to prevent tampering and ensure authenticity.
@@ -43,10 +51,10 @@ Agent                          Server
 
 ### Replay Protection
 
-The server rejects batches with timestamps outside the configured window:
+The server rejects batches and handshakes with timestamps outside the configured window:
 
 ```
-REPLAY_WINDOW_MS=300000    # 5 minutes (default)
+REPLAY_WINDOW_MS=300000    # 5 minutes (default, configurable via ServerConfig)
 ```
 
 Any batch with `|now - batch_timestamp| > window` is rejected with `REJECTED` status.
@@ -97,7 +105,9 @@ sentinel key delete --agent-id my-server --key-id old-key-uuid
 
 ## JWT Authentication
 
-The REST API uses JWT (HS256) for protected endpoints.
+The REST API uses JWT (HS256) for protected endpoints. All `/v1/` routes (except provisioning) require a valid `Authorization: Bearer <token>` header.
+
+Public endpoints (no auth required): `/healthz`, `/ready`, `/metrics`, `/v1/agents/generate-install`.
 
 ### Token Structure
 
@@ -117,7 +127,7 @@ Set the JWT signing secret on the server:
 sentinel_server --jwt-secret "your-strong-secret-here"
 ```
 
-The secret must be at least 32 characters for adequate security.
+The server warns at startup if the default secret is detected. The secret must be at least 32 characters for adequate security.
 
 ## Agent Provisioning
 
@@ -191,6 +201,22 @@ Outbound webhook notifications are signed with HMAC-SHA256 when a `secret` is co
 ```
 
 The signature is sent in the `X-Sentinel-Signature` header for verification by the receiver.
+
+## Secret Masking
+
+SentinelRS masks sensitive values in all output surfaces:
+
+- **CLI**: `config show` and `register` mask tokens and secrets by default. Use `--reveal` to show cleartext.
+- **Server logs**: Bootstrap tokens, HMAC keys, and JWT secrets are never logged in cleartext. Only agent IDs and key IDs appear in logs.
+- **JSON output**: Serialized configs replace secrets with masked form (`abcd***wxyz`).
+
+## Secret Generation
+
+All secrets (HMAC keys, bootstrap tokens) are generated using a cryptographically secure PRNG (`rand::thread_rng`) producing 32 bytes of entropy. UUID-based generation is no longer used.
+
+## Unsigned Batch Rejection
+
+Workers reject metric batches that arrive without a valid HMAC signature. Missing signatures or unknown agent secrets result in immediate rejection (not skip).
 
 ## Security Checklist
 

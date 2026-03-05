@@ -1,0 +1,12 @@
+name: multi_gauge
+version: "1.0.0"
+entry_fn: collect
+capabilities:
+    - metric_builder
+resource_limits:
+    max_memory_mb: 16
+    timeout_ms: 3000
+    max_metrics: 100
+metadata:
+    author: sentinel-team
+    description: Example plugin emitting multiple gauge metrics

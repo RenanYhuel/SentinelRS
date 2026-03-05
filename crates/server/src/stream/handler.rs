@@ -36,6 +36,7 @@ pub struct StreamService<B: BrokerPublisher> {
     registry: SessionRegistry,
     events: PresenceEventBus,
     grace_period_ms: i64,
+    replay_window_ms: i64,
     token_store: Option<TokenStore>,
     agent_repo: Option<Arc<AgentRepo>>,
     server_url: String,
@@ -43,6 +44,7 @@ pub struct StreamService<B: BrokerPublisher> {
 }
 
 impl<B: BrokerPublisher> StreamService<B> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         agents: AgentStore,
         idempotency: IdempotencyStore,
@@ -50,6 +52,7 @@ impl<B: BrokerPublisher> StreamService<B> {
         registry: SessionRegistry,
         events: PresenceEventBus,
         grace_period_ms: i64,
+        replay_window_ms: i64,
         metrics: Arc<ServerMetrics>,
     ) -> Self {
         Self {
@@ -59,6 +62,7 @@ impl<B: BrokerPublisher> StreamService<B> {
             registry,
             events,
             grace_period_ms,
+            replay_window_ms,
             token_store: None,
             agent_repo: None,
             server_url: String::new(),
@@ -99,6 +103,7 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
         let broker = self.broker.clone();
         let registry = self.registry.clone();
         let grace_period_ms = self.grace_period_ms;
+        let replay_window_ms = self.replay_window_ms;
         let token_store = self.token_store.clone();
         let agent_repo = self.agent_repo.clone();
         let server_url = self.server_url.clone();
@@ -115,6 +120,7 @@ impl<B: BrokerPublisher + 'static> SentinelStream for StreamService<B> {
                 registry,
                 events,
                 grace_period_ms,
+                replay_window_ms,
                 token_store,
                 agent_repo,
                 server_url,
@@ -141,6 +147,7 @@ async fn run_stream<B: BrokerPublisher>(
     registry: SessionRegistry,
     events: PresenceEventBus,
     grace_period_ms: i64,
+    replay_window_ms: i64,
     token_store: Option<TokenStore>,
     agent_repo: Option<Arc<AgentRepo>>,
     server_url: String,
@@ -152,6 +159,7 @@ async fn run_stream<B: BrokerPublisher>(
         &agents,
         &registry,
         grace_period_ms,
+        replay_window_ms,
         token_store.as_ref(),
         agent_repo.as_deref(),
         &server_url,
@@ -218,6 +226,7 @@ async fn wait_for_handshake(
     agents: &AgentStore,
     registry: &SessionRegistry,
     grace_period_ms: i64,
+    replay_window_ms: i64,
     token_store: Option<&TokenStore>,
     agent_repo: Option<&AgentRepo>,
     server_url: &str,
@@ -236,7 +245,7 @@ async fn wait_for_handshake(
             handle_bootstrap_request(tx, token_store, agents, agent_repo, req, server_url).await
         }
         Some(AgentPayload::Handshake(h)) => {
-            complete_handshake(tx, agents, registry, &h, grace_period_ms).await
+            complete_handshake(tx, agents, registry, &h, grace_period_ms, replay_window_ms).await
         }
         _ => {
             let _ = tx
@@ -305,8 +314,9 @@ async fn complete_handshake(
     registry: &SessionRegistry,
     handshake: &sentinel_common::proto::HandshakeRequest,
     grace_period_ms: i64,
+    replay_window_ms: i64,
 ) -> Result<(String, String), StreamError> {
-    match authenticate_handshake(agents, handshake, grace_period_ms) {
+    match authenticate_handshake(agents, handshake, grace_period_ms, replay_window_ms) {
         AuthOutcome::Authenticated(auth) => {
             if registry.contains(&auth.agent_id) {
                 registry.unregister(&auth.agent_id);

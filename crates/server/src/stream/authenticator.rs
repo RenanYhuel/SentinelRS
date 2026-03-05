@@ -3,8 +3,6 @@ use sentinel_common::proto::{HandshakeAck, HandshakeRequest, HandshakeStatus};
 use crate::auth::verify_signature;
 use crate::store::AgentStore;
 
-const REPLAY_WINDOW_MS: i64 = 5 * 60 * 1000;
-
 pub struct AuthResult {
     pub agent_id: String,
     pub agent_version: String,
@@ -21,6 +19,7 @@ pub fn authenticate_handshake(
     agents: &AgentStore,
     req: &HandshakeRequest,
     grace_period_ms: i64,
+    replay_window_ms: i64,
 ) -> AuthOutcome {
     if req.agent_id.is_empty() {
         return AuthOutcome::Rejected(reject_ack("agent_id is required"));
@@ -34,7 +33,7 @@ pub fn authenticate_handshake(
     let now_ms = current_time_ms();
     if req.timestamp_ms > 0 {
         let drift = (now_ms - req.timestamp_ms).abs();
-        if drift > REPLAY_WINDOW_MS {
+        if drift > replay_window_ms {
             return AuthOutcome::Rejected(reject_ack("handshake timestamp outside replay window"));
         }
     }

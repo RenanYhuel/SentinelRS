@@ -14,6 +14,7 @@ use crate::collector::SystemCollector;
 use crate::config::AgentConfig;
 use crate::exporter::{GrpcClient, RetryPolicy, SendLoop};
 use crate::persistence::{AgentPersistedState, VolumeLayout};
+use crate::plugin::PluginScheduler;
 use crate::scheduler::ScheduledTask;
 use crate::stream::StreamClient;
 use sentinel_common::logging;
@@ -76,7 +77,8 @@ pub async fn run(config: AgentConfig, legacy_mode: bool) -> Result<(), Box<dyn s
 
     let (metrics_tx, metrics_rx) = mpsc::channel(256);
 
-    spawn_collector(config.collect.interval_seconds, metrics_tx);
+    spawn_collector(config.collect.interval_seconds, metrics_tx.clone());
+    spawn_plugin_scheduler(&config, metrics_tx);
     spawn_batcher(agent_id.clone(), wal.clone(), metrics_rx, resume_seq);
 
     if legacy_mode {
@@ -329,4 +331,22 @@ fn resolve_secret(config: &AgentConfig) -> Result<Vec<u8>, Box<dyn std::error::E
     }
     tracing::warn!(target: "auth", "No secret configured, HMAC signing will use an empty key");
     Ok(Vec::new())
+}
+
+fn spawn_plugin_scheduler(
+    config: &AgentConfig,
+    tx: mpsc::Sender<Vec<sentinel_common::proto::Metric>>,
+) {
+    if !config.plugins.enabled {
+        tracing::info!(target: "plugin", "Plugin system disabled");
+        return;
+    }
+
+    let mut scheduler = PluginScheduler::new(config.plugins.clone());
+    scheduler.discover();
+
+    if scheduler.loaded_count() > 0 {
+        let _handle = scheduler.spawn(tx);
+        tracing::info!(target: "plugin", "Plugin scheduler started");
+    }
 }

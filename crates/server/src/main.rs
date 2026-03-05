@@ -39,6 +39,13 @@ async fn main() {
 
     let config = ServerConfig::from_env_and_args();
 
+    if config.jwt_secret == b"change-me-in-production" {
+        tracing::warn!(
+            target: "auth",
+            "Using default JWT secret — set JWT_SECRET or --jwt-secret for production"
+        );
+    }
+
     let (pool, agent_repo, rule_repo, notifier_repo, history_repo, metrics_qrepo) = match config
         .database_url
     {
@@ -185,6 +192,7 @@ async fn main() {
         session_registry.clone(),
         presence_events.clone(),
         config.key_grace_period_ms,
+        config.replay_window_ms,
         server_metrics.clone(),
     )
     .with_provisioning(
@@ -195,9 +203,15 @@ async fn main() {
 
     let grpc_addr = config.grpc_addr;
 
-    let grpc_tls = tls_identity
-        .as_ref()
-        .map(|id| id.tonic_server_tls().expect("gRPC TLS config build failed"));
+    let grpc_tls = tls_identity.as_ref().map(|id| {
+        let require_client = config
+            .tls
+            .as_ref()
+            .map(|c| c.require_client_auth)
+            .unwrap_or(false);
+        id.tonic_server_tls(require_client)
+            .expect("gRPC TLS config build failed")
+    });
 
     let grpc_handle = tokio::spawn(async move {
         tracing::info!(target: "net", addr = %grpc_addr, "gRPC listening (V1 + V2 streaming)");

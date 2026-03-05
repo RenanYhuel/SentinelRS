@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Args;
+use sentinel_common::redact::mask_token;
 use tonic::transport::Channel;
 
 use crate::output::{input, print_info, print_json, spinner, theme, OutputMode};
@@ -16,6 +17,9 @@ pub struct RegisterArgs {
 
     #[arg(long)]
     save: bool,
+
+    #[arg(long, help = "Show secret in clear text")]
+    reveal: bool,
 }
 
 pub async fn run(args: RegisterArgs, mode: OutputMode, server: Option<String>) -> Result<()> {
@@ -60,15 +64,21 @@ pub async fn run(args: RegisterArgs, mode: OutputMode, server: Option<String>) -
         spinner::finish_ok(&sp, "Agent registered successfully");
     }
 
+    let display_secret = if args.reveal {
+        response.secret.clone()
+    } else {
+        mask_token(&response.secret)
+    };
+
     match mode {
         OutputMode::Json => print_json(&serde_json::json!({
             "agent_id": response.agent_id,
-            "secret": response.secret,
+            "secret": display_secret,
         }))?,
         OutputMode::Human => {
             theme::print_section("Credentials");
             theme::print_kv("Agent ID", &response.agent_id);
-            theme::print_kv("Secret", &response.secret);
+            theme::print_kv("Secret", &display_secret);
             if args.save {
                 println!();
                 print_info("Saved", "credentials stored locally");

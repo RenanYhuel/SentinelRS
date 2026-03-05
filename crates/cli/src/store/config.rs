@@ -1,3 +1,4 @@
+use sentinel_common::redact::mask_token;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -118,11 +119,12 @@ impl CliConfig {
     }
 
     pub fn masked_token(&self) -> String {
-        let t = &self.auth.jwt_token;
-        if t.len() <= 8 {
-            "***".into()
-        } else {
-            format!("{}...{}", &t[..4], &t[t.len() - 4..])
-        }
+        mask_token(&self.auth.jwt_token)
+    }
+
+    pub fn redacted(&self) -> Self {
+        let mut c = self.clone();
+        c.auth.jwt_token = self.masked_token();
+        c
     }
 }

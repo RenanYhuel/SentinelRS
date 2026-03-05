@@ -13,7 +13,9 @@ async fn setup_pool() -> PgPool {
         max_connections: 2,
         ..PoolConfig::default()
     };
-    create_pool(&url, &config).await.expect("connect to TimescaleDB")
+    create_pool(&url, &config)
+        .await
+        .expect("connect to TimescaleDB")
 }
 
 async fn clean_tables(pool: &PgPool) {

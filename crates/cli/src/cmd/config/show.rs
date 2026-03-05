@@ -14,7 +14,13 @@ pub fn run(args: ShowArgs, mode: OutputMode) -> Result<()> {
     let cfg = store::load()?;
 
     match mode {
-        OutputMode::Json => print_json(&cfg)?,
+        OutputMode::Json => {
+            if args.reveal {
+                print_json(&cfg)?;
+            } else {
+                print_json(&cfg.redacted())?;
+            }
+        }
         OutputMode::Human => {
             theme::print_header("CLI Configuration");
             theme::print_kv("Server URL", cfg.server_url());

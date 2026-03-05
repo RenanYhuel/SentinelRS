@@ -1,3 +1,4 @@
+use axum::middleware;
 use axum::routing::{get, post};
 use axum::Router;
 use sqlx::PgPool;
@@ -8,6 +9,7 @@ use super::{
     notification_history, notifier_configs, notifiers, provisioning, rules,
 };
 use crate::metrics::server_metrics::ServerMetrics;
+use crate::middleware::require_auth;
 use crate::persistence::{MetricsQueryRepo, NotificationHistoryRepo, NotifierRepo, RuleRepo};
 use crate::provisioning::TokenStore;
 use crate::store::{AgentStore, RuleStore};
@@ -32,10 +34,18 @@ pub struct AppState {
 
 pub fn router(state: AppState) -> Router {
     let metrics_state = state.metrics.clone();
-    Router::new()
+    let jwt_secret = state.jwt_secret.clone();
+
+    let public = Router::new()
         .route("/healthz", get(health::healthz))
         .route("/ready", get(health::ready))
         .route("/metrics", get(metrics::metrics).with_state(metrics_state))
+        .route(
+            "/v1/agents/generate-install",
+            post(provisioning::generate_install),
+        );
+
+    let protected = Router::new()
         .route("/v1/agents", get(agents::list_agents))
         .route("/v1/agents/:agent_id", get(agents::get_agent))
         .route(
@@ -47,10 +57,6 @@ pub fn router(state: AppState) -> Router {
             post(key_rotation::rotate_key),
         )
         .route("/v1/fleet/overview", get(fleet::fleet_overview))
-        .route(
-            "/v1/agents/generate-install",
-            post(provisioning::generate_install),
-        )
         .route("/v1/rules", get(rules::list_rules).post(rules::create_rule))
         .route(
             "/v1/rules/:rule_id",
@@ -119,5 +125,10 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/cluster/agents", get(cluster::agent_ids))
         .route("/v1/cluster/events", get(cluster::cluster_events))
         .route("/v1/agents/:agent_id/live", get(cluster::agent_live))
-        .with_state(state)
+        .layer(middleware::from_fn(move |req, next| {
+            let auth_fn = require_auth(jwt_secret.clone());
+            auth_fn(req, next)
+        }));
+
+    public.merge(protected).with_state(state)
 }
