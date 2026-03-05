@@ -65,12 +65,18 @@ async fn deploy_docker_agent(name: &str, token: &str, mode: OutputMode) -> Resul
 
     let cfg = crate::store::load().unwrap_or_default();
     let server_url = &cfg.server.grpc_url;
+    let project = if cfg.docker.project_name.is_empty() {
+        "sentinel".to_string()
+    } else {
+        cfg.docker.project_name.clone()
+    };
+    let network = format!("{project}_sentinel-net");
 
     cleanup_existing_container(&container_name).await;
 
     let sp = spinner::create(&format!("Deploying container '{container_name}'..."));
 
-    let status = tokio::process::Command::new("docker")
+    let output = tokio::process::Command::new("docker")
         .args([
             "run",
             "-d",
@@ -83,26 +89,32 @@ async fn deploy_docker_agent(name: &str, token: &str, mode: OutputMode) -> Resul
             "-v",
             &format!("{container_name}-config:/etc/sentinel"),
             "--network",
-            "sentinel-net",
+            &network,
             "--restart",
             "unless-stopped",
             "sentinelrs/agent:latest",
         ])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .status()
+        .output()
         .await;
 
-    match status {
-        Ok(s) if s.success() => {
+    match output {
+        Ok(o) if o.status.success() => {
             spinner::finish_ok(&sp, &format!("Agent '{name}' deployed"));
             if mode == OutputMode::Human {
                 wait_for_agent(name, &container_name).await;
             }
         }
-        _ => {
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
             spinner::finish_err(&sp, "Docker deployment failed");
-            anyhow::bail!("failed to start container '{container_name}'");
+            anyhow::bail!(
+                "failed to start container '{container_name}': {}",
+                stderr.trim()
+            );
+        }
+        Err(e) => {
+            spinner::finish_err(&sp, "Docker deployment failed");
+            anyhow::bail!("failed to run docker: {e}");
         }
     }
 
