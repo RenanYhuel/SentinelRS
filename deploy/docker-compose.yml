@@ -114,6 +114,7 @@ services:
             sentinel-server:
                 condition: service_healthy
         environment:
+            BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
             SERVER_URL: ${SERVER_URL:-http://sentinel-server:50051}
             RUST_LOG: ${AGENT_LOG_LEVEL:-info}
             AGENT_COLLECT_INTERVAL: ${AGENT_COLLECT_INTERVAL:-10}

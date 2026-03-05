@@ -78,6 +78,7 @@ async fn full_pipeline_verify_dedup_transform_alert() {
     for row in &rows {
         if let Some(v) = row.value {
             aggregator.ingest(&row.agent_id, &row.name, row.time_ms, v);
+            aggregator.ingest(&row.agent_id, &row.name, row.time_ms + 1000, v);
         }
     }
 
