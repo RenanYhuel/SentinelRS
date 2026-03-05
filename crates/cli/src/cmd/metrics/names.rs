@@ -34,7 +34,7 @@ pub async fn run(args: NamesArgs, mode: OutputMode, server: Option<String>) -> R
 fn render(agent_id: &str, data: &serde_json::Value) {
     theme::print_header(&format!("Metric Names — {agent_id}"));
 
-    let items = match data.as_array() {
+    let items = match data["names"].as_array() {
         Some(arr) if !arr.is_empty() => arr,
         _ => {
             theme::print_dim("No metrics found for this agent");

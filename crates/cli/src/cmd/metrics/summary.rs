@@ -27,7 +27,7 @@ pub async fn run(mode: OutputMode, server: Option<String>) -> Result<()> {
 fn render(data: &serde_json::Value) {
     theme::print_header("Fleet Metrics Summary");
 
-    let items = match data.as_array() {
+    let items = match data["agents"].as_array() {
         Some(arr) if !arr.is_empty() => arr,
         _ => {
             theme::print_dim("No agent metrics found");

@@ -53,7 +53,7 @@ pub async fn run(args: CompareArgs, mode: OutputMode, server: Option<String>) ->
 fn render(metric: &str, data: &serde_json::Value) {
     theme::print_header(&format!("Compare — {metric}"));
 
-    let points = match data.as_array() {
+    let points = match data["points"].as_array() {
         Some(arr) if !arr.is_empty() => arr,
         _ => {
             theme::print_dim("No comparison data available");

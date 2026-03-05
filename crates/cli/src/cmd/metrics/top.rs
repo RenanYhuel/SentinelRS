@@ -40,7 +40,7 @@ pub async fn run(args: TopArgs, mode: OutputMode, server: Option<String>) -> Res
 fn render(agent_id: &str, data: &serde_json::Value) {
     theme::print_header(&format!("Top Metrics — {agent_id}"));
 
-    let items = match data.as_array() {
+    let items = match data["top"].as_array() {
         Some(arr) if !arr.is_empty() => arr,
         _ => {
             theme::print_dim("No metrics found");

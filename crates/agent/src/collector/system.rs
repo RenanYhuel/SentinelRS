@@ -109,19 +109,28 @@ impl SystemCollector {
                 } else {
                     name
                 };
+                let total = disk.total_space() as f64;
+                let available = disk.available_space() as f64;
+                let usage_pct = if total > 0.0 {
+                    ((total - available) / total) * 100.0
+                } else {
+                    0.0
+                };
                 let mut labels = HashMap::new();
                 labels.insert("device".into(), dev.clone());
                 vec![
+                    Self::gauge(&format!("disk.{dev}.total_bytes"), total, labels.clone()),
                     Self::gauge(
-                        &format!("disk.{}.total_bytes", dev),
-                        disk.total_space() as f64,
+                        &format!("disk.{dev}.available_bytes"),
+                        available,
                         labels.clone(),
                     ),
                     Self::gauge(
-                        &format!("disk.{}.available_bytes", dev),
-                        disk.available_space() as f64,
-                        labels,
+                        &format!("disk.{dev}.usage_percent"),
+                        usage_pct,
+                        labels.clone(),
                     ),
+                    Self::gauge("disk.usage_percent", usage_pct, labels),
                 ]
             })
             .collect()

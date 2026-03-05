@@ -55,7 +55,7 @@ pub async fn run(args: HistoryArgs, mode: OutputMode, server: Option<String>) ->
 fn render(agent_id: &str, metric: &str, data: &serde_json::Value) {
     theme::print_header(&format!("{metric} — {agent_id}"));
 
-    let points = match data.as_array() {
+    let points = match data["points"].as_array() {
         Some(arr) if !arr.is_empty() => arr,
         _ => {
             theme::print_dim("No history data for this metric");
