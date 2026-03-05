@@ -62,8 +62,9 @@ services:
         environment:
             DATABASE_URL: ${DATABASE_URL:-postgres://sentinel:sentinel_secret@timescaledb:5432/sentinel}
             NATS_URL: ${NATS_URL:-nats://nats:4222}
-            SERVER_GRPC_PORT: ${SERVER_GRPC_PORT:-50051}
-            SERVER_REST_PORT: ${SERVER_REST_PORT:-8080}
+            GRPC_PORT: ${GRPC_PORT:-50051}
+            REST_PORT: ${REST_PORT:-8080}
+            JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
             SERVER_GRPC_ADVERTISE_ADDR: ${SERVER_GRPC_ADVERTISE_ADDR:-http://sentinel-server:50051}
             RUST_LOG: ${SERVER_LOG_LEVEL:-info}
         ports:

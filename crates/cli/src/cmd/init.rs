@@ -58,18 +58,27 @@ pub async fn execute(mode: OutputMode) -> Result<()> {
     }
 
     if reachable {
-        if let Ok(secret) = input::password("JWT secret (from server config)") {
-            let token = fetch_token(&server_url, &secret).await;
-            match token {
-                Ok(t) => {
-                    cfg.auth.jwt_token = t;
-                    if mode == OutputMode::Human {
-                        theme::print_dim("  Authenticated successfully");
-                    }
-                }
-                Err(e) => {
-                    if mode == OutputMode::Human {
-                        theme::print_dim(&format!("  Authentication failed: {e}"));
+        let sp = spinner::create("Authenticating...");
+        match silent_auth(&server_url, &cfg.docker.compose_file).await {
+            Some(token) => {
+                cfg.auth.jwt_token = token;
+                spinner::finish_ok(&sp, "Token acquired");
+            }
+            None => {
+                spinner::finish_err(&sp, "Auto-discovery failed");
+                if let Ok(secret) = input::password("JWT secret") {
+                    match fetch_token(&server_url, &secret).await {
+                        Ok(t) => {
+                            cfg.auth.jwt_token = t;
+                            if mode == OutputMode::Human {
+                                theme::print_dim("  Authenticated");
+                            }
+                        }
+                        Err(e) => {
+                            if mode == OutputMode::Human {
+                                theme::print_dim(&format!("  Authentication failed: {e}"));
+                            }
+                        }
                     }
                 }
             }
@@ -123,4 +132,43 @@ async fn fetch_token(server_url: &str, secret: &str) -> Result<String> {
         .as_str()
         .map(|s| s.to_string())
         .ok_or_else(|| anyhow::anyhow!("missing token in response"))
+}
+
+async fn silent_auth(server_url: &str, compose_file: &str) -> Option<String> {
+    let mut candidates = Vec::new();
+    if let Some(secret) = extract_jwt_secret_from_compose(compose_file) {
+        candidates.push(secret);
+    }
+    candidates.push("change-me-in-production".to_string());
+    candidates.dedup();
+    for secret in candidates {
+        if let Ok(token) = fetch_token(server_url, &secret).await {
+            return Some(token);
+        }
+    }
+    None
+}
+
+fn extract_jwt_secret_from_compose(path: &str) -> Option<String> {
+    if path.is_empty() {
+        return None;
+    }
+    let content = std::fs::read_to_string(path).ok()?;
+    let yaml: serde_yaml::Value = serde_yaml::from_str(&content).ok()?;
+    let env = yaml
+        .get("services")?
+        .get("sentinel-server")?
+        .get("environment")?;
+    let raw = env.get("JWT_SECRET")?.as_str()?;
+    resolve_compose_var(raw)
+}
+
+fn resolve_compose_var(raw: &str) -> Option<String> {
+    if let Some(inner) = raw.strip_prefix("${").and_then(|s| s.strip_suffix('}')) {
+        if let Some(pos) = inner.find(":-") {
+            return Some(inner[pos + 2..].to_string());
+        }
+        return std::env::var(inner).ok();
+    }
+    Some(raw.to_string())
 }
