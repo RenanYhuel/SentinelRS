@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use reqwest::StatusCode;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
 pub struct ApiClient {
     base_url: String,
@@ -11,6 +12,21 @@ impl ApiClient {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             http: reqwest::Client::new(),
+        }
+    }
+
+    pub fn with_token(base_url: &str, token: &str) -> Self {
+        let mut headers = HeaderMap::new();
+        if let Ok(val) = HeaderValue::from_str(&format!("Bearer {token}")) {
+            headers.insert(AUTHORIZATION, val);
+        }
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap_or_default();
+        Self {
+            base_url: base_url.trim_end_matches('/').to_string(),
+            http,
         }
     }
 

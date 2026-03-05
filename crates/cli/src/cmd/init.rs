@@ -46,7 +46,7 @@ pub async fn execute(mode: OutputMode) -> Result<()> {
     let output_idx = select::select_option("Default output format", output_options).unwrap_or(0);
 
     let mut cfg = CliConfig::default();
-    cfg.server.url = server_url;
+    cfg.server.url = server_url.clone();
     cfg.server.grpc_url = grpc_url;
     cfg.defaults.output_format = output_options[output_idx].to_string();
 
@@ -54,6 +54,25 @@ pub async fn execute(mode: OutputMode) -> Result<()> {
         let compose = input::text_optional("Docker compose file path")?;
         if let Some(path) = compose {
             cfg.docker.compose_file = path;
+        }
+    }
+
+    if reachable {
+        if let Ok(secret) = input::password("JWT secret (from server config)") {
+            let token = fetch_token(&server_url, &secret).await;
+            match token {
+                Ok(t) => {
+                    cfg.auth.jwt_token = t;
+                    if mode == OutputMode::Human {
+                        theme::print_dim("  Authenticated successfully");
+                    }
+                }
+                Err(e) => {
+                    if mode == OutputMode::Human {
+                        theme::print_dim(&format!("  Authentication failed: {e}"));
+                    }
+                }
+            }
         }
     }
 
@@ -90,4 +109,22 @@ async fn check_docker() -> bool {
         .await
         .map(|s| s.success())
         .unwrap_or(false)
+}
+
+async fn fetch_token(server_url: &str, secret: &str) -> Result<String> {
+    let url = format!("{}/v1/auth/token", server_url.trim_end_matches('/'));
+    let body = serde_json::json!({ "secret": secret });
+    let resp = reqwest::Client::new()
+        .post(&url)
+        .json(&body)
+        .send()
+        .await?;
+    if !resp.status().is_success() {
+        anyhow::bail!("invalid secret or server rejected request");
+    }
+    let json: serde_json::Value = resp.json().await?;
+    json["token"]
+        .as_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| anyhow::anyhow!("missing token in response"))
 }

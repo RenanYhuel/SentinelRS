@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use super::{
     agent_health, agent_metrics, agents, alerts, cluster, fleet, health, key_rotation, metrics,
-    notification_history, notifier_configs, notifiers, provisioning, rules,
+    notification_history, notifier_configs, notifiers, provisioning, rules, token,
 };
 use crate::metrics::server_metrics::ServerMetrics;
 use crate::middleware::require_auth;
@@ -43,7 +43,8 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/v1/agents/generate-install",
             post(provisioning::generate_install),
-        );
+        )
+        .route("/v1/auth/token", post(token::create_api_token));
 
     let protected = Router::new()
         .route("/v1/agents", get(agents::list_agents))

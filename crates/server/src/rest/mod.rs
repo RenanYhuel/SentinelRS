@@ -15,5 +15,6 @@ mod notifiers;
 mod provisioning;
 mod router;
 mod rules;
+mod token;
 
 pub use router::{router, AppState};
